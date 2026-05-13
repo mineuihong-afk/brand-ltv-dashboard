@@ -6,9 +6,9 @@
 <title>카테고리 TOP1 브랜드 LTV / 잔존율 분석</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Apple SD Gothic Neo', sans-serif; background: #f0f2f5; color: #1a1a2e; }
-  header { background: linear-gradient(135deg,#1a1a2e,#0f3460); color:white; padding:28px 40px; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Apple SD Gothic Neo',sans-serif; background:#f0f2f5; color:#1a1a2e; }
+  header { background:linear-gradient(135deg,#1a1a2e,#0f3460); color:white; padding:28px 40px; }
   header h1 { font-size:22px; font-weight:700; }
   header p  { font-size:13px; color:#a8b4d0; margin-top:6px; }
   .note { background:#fffbe6; border-left:4px solid #f59e0b; padding:10px 16px; margin:16px 40px 0; font-size:12px; color:#555; border-radius:4px; }
@@ -19,10 +19,11 @@
   .panel.active { display:block; }
   .section-title { font-size:15px; font-weight:700; color:#0f3460; margin:24px 0 12px; padding-left:12px; border-left:4px solid #0f3460; }
   .card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(195px,1fr)); gap:10px; margin-bottom:8px; }
-  .card { background:#f8f9fc; border-radius:8px; padding:14px 16px; border:1px solid #e2e8f0; }
+  .card { background:#f8f9fc; border-radius:8px; padding:14px 16px; border:1px solid #e2e8f0; position:relative; }
   .card .rank { font-size:11px; color:#888; margin-bottom:4px; }
   .card .brand-name { font-size:15px; font-weight:700; }
   .cat-badge { display:inline-block; font-size:10px; padding:2px 6px; border-radius:10px; background:#e8f4fd; color:#1d7dbd; margin:4px 0 8px; font-weight:600; }
+  .cat-badge.sb { background:#00704a22; color:#00704a; }
   .card .metric { display:flex; justify-content:space-between; font-size:12px; margin:3px 0; }
   .card .metric .label { color:#777; }
   .card .metric .value { font-weight:700; }
@@ -30,6 +31,8 @@
   .card.top2 { background:linear-gradient(135deg,#f0f0f0,#fafafa); border-color:#aaa; }
   .card.top3 { background:linear-gradient(135deg,#fff3ec,#fffaf8); border-color:#cd7c4b; }
   .card.bot  { background:#fef2f2; border-color:#fca5a5; }
+  .card.sbcard { background:linear-gradient(135deg,#f0faf6,#e8f8f2); border:2px solid #00704a; }
+  .sb-tag { position:absolute; top:10px; right:10px; background:#00704a; color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:10px; }
   .chart-row { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
   .chart-box { background:#f8f9fc; border-radius:8px; padding:16px; border:1px solid #e2e8f0; }
   .chart-box h3 { font-size:13px; color:#555; margin-bottom:12px; text-align:center; }
@@ -40,6 +43,7 @@
   th { background:#1a1a2e; color:white; padding:10px 12px; text-align:center; font-weight:600; }
   td { padding:9px 12px; text-align:center; border-bottom:1px solid #eee; }
   tr:hover td { background:#f0f4ff; }
+  tr.sb-row td { background:#f0faf6 !important; font-weight:600; }
   .td-brand { text-align:left; font-weight:600; }
   .td-cat { font-size:11px; color:#777; }
   .pos { color:#059669; font-weight:700; }
@@ -48,11 +52,11 @@
 </head>
 <body>
 <header>
-  <h1>📊 카테고리 TOP1 브랜드 LTV / 잔존율 분석</h1>
+  <h1>📊 카테고리 TOP1 브랜드 LTV / 잔존율 분석 <span style="font-size:14px;opacity:.7;">+ 스타벅스 비교</span></h1>
   <p>코호트 기준: 25/03~26/03 | M+12 누적 | 할인비용: 우형부담(쿠폰+HVA+MFO+배민클럽) | 세그: 해당월 첫주문 기준</p>
 </header>
 <div class="note">
-  ⚠️ M+12 잔존율·LTV는 <strong>25/03~25/05 코호트 기준</strong> (M+12 데이터 보유 코호트). 각 month_diff는 해당 시점 데이터 보유 코호트 기준으로 산출.
+  ⚠️ M+12 잔존율·LTV는 <strong>25/03~25/05 코호트 기준</strong> (M+12 데이터 보유 코호트). 각 month_diff는 해당 시점 데이터 보유 코호트 기준으로 산출. 스타벅스는 <span style="color:#00704a;font-weight:700;">초록색</span>으로 강조.
 </div>
 <div class="tabs">
   <div class="tab active" onclick="switchTab('first')">0. 첫주문</div>
@@ -3186,6 +3190,396 @@ const RAW =[
         "cum_flgp":  15809
     },
     {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  43299,
+        "cum_dc":  11379,
+        "cum_flgp":  -4103
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  39.43,
+        "cum_ltv":  79661,
+        "cum_dc":  16030,
+        "cum_flgp":  -3685
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  29.81,
+        "cum_ltv":  107030,
+        "cum_dc":  18750,
+        "cum_flgp":  -2667
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  26.12,
+        "cum_ltv":  131461,
+        "cum_dc":  21076,
+        "cum_flgp":  -1615
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  26.17,
+        "cum_ltv":  154655,
+        "cum_dc":  23317,
+        "cum_flgp":  -554
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  24.59,
+        "cum_ltv":  177363,
+        "cum_dc":  25506,
+        "cum_flgp":  493
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  23.45,
+        "cum_ltv":  201517,
+        "cum_dc":  27552,
+        "cum_flgp":  1592
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  26.11,
+        "cum_ltv":  232049,
+        "cum_dc":  29882,
+        "cum_flgp":  3271
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  24.77,
+        "cum_ltv":  262658,
+        "cum_dc":  32187,
+        "cum_flgp":  5205
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  24.34,
+        "cum_ltv":  289663,
+        "cum_dc":  34318,
+        "cum_flgp":  6346
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  22.57,
+        "cum_ltv":  313366,
+        "cum_dc":  36314,
+        "cum_flgp":  7274
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  21.02,
+        "cum_ltv":  336429,
+        "cum_dc":  38301,
+        "cum_flgp":  8347
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  21.56,
+        "cum_ltv":  359729,
+        "cum_dc":  40512,
+        "cum_flgp":  9429
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  182375,
+        "cum_dc":  17215,
+        "cum_flgp":  3505
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  89.25,
+        "cum_ltv":  355276,
+        "cum_dc":  32872,
+        "cum_flgp":  8326
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  86.12,
+        "cum_ltv":  516417,
+        "cum_dc":  47628,
+        "cum_flgp":  13709
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  83.53,
+        "cum_ltv":  667034,
+        "cum_dc":  61474,
+        "cum_flgp":  19434
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  80.67,
+        "cum_ltv":  807361,
+        "cum_dc":  73771,
+        "cum_flgp":  25672
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  78.71,
+        "cum_ltv":  953976,
+        "cum_dc":  85813,
+        "cum_flgp":  32538
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  79.19,
+        "cum_ltv":  1118112,
+        "cum_dc":  98723,
+        "cum_flgp":  40459
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  80.07,
+        "cum_ltv":  1292381,
+        "cum_dc":  112361,
+        "cum_flgp":  48585
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  79.21,
+        "cum_ltv":  1466949,
+        "cum_dc":  126109,
+        "cum_flgp":  56382
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  78.34,
+        "cum_ltv":  1638814,
+        "cum_dc":  139625,
+        "cum_flgp":  63359
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  76.56,
+        "cum_ltv":  1804641,
+        "cum_dc":  152715,
+        "cum_flgp":  70662
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  74.94,
+        "cum_ltv":  1957857,
+        "cum_dc":  164908,
+        "cum_flgp":  78625
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  72.3,
+        "cum_ltv":  2097927,
+        "cum_dc":  176241,
+        "cum_flgp":  86593
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  41601,
+        "cum_dc":  4882,
+        "cum_flgp":  -18
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  60.65,
+        "cum_ltv":  81429,
+        "cum_dc":  8548,
+        "cum_flgp":  1104
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  55.49,
+        "cum_ltv":  118387,
+        "cum_dc":  11682,
+        "cum_flgp":  2390
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  52.84,
+        "cum_ltv":  154403,
+        "cum_dc":  14797,
+        "cum_flgp":  3835
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  51.5,
+        "cum_ltv":  190263,
+        "cum_dc":  17915,
+        "cum_flgp":  5483
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  48.69,
+        "cum_ltv":  224206,
+        "cum_dc":  20667,
+        "cum_flgp":  7161
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  45.98,
+        "cum_ltv":  257316,
+        "cum_dc":  23143,
+        "cum_flgp":  8828
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  48.65,
+        "cum_ltv":  297965,
+        "cum_dc":  26076,
+        "cum_flgp":  10784
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  48.64,
+        "cum_ltv":  340482,
+        "cum_dc":  29199,
+        "cum_flgp":  12748
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  48.32,
+        "cum_ltv":  384018,
+        "cum_dc":  32377,
+        "cum_flgp":  14556
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  47.07,
+        "cum_ltv":  425775,
+        "cum_dc":  35462,
+        "cum_flgp":  16415
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  44.67,
+        "cum_ltv":  464428,
+        "cum_dc":  38377,
+        "cum_flgp":  18383
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  42.3,
+        "cum_ltv":  501408,
+        "cum_dc":  41335,
+        "cum_flgp":  20400
+    },
+    {
         "brand":  "역전할머니맥주",
         "category":  "NIGHTSNACK",
         "seg":  "0.첫주문",
@@ -5917,15 +6311,15 @@ const RAW =[
     }
 ]
 ;
-const SEG_MAP   = { first:'0.첫주문', active:'1.활성', ret:'2.이탈복귀' };
-const CAT_KO    = { CHICKEN:'치킨',FASTFOOD:'패스트푸드',SNACK:'분식',ZZIM_TANG:'찜/탕',CHINESE:'중식',BAEKBAN:'백반/죽',DOSIRAK:'도시락',JOKBAL:'족발/보쌈',PIZZA:'피자',CAFE:'카페',JAPANESE:'일식',WESTERN:'양식',NIGHTSNACK:'야식',MEAT:'육류',ASIAN:'아시안' };
-const PALETTE   = ['#e63946','#457b9d','#2a9d8f','#e9c46a','#f4a261','#264653','#a8dadc','#06d6a0','#ef476f','#ffd166','#118ab2','#073b4c','#9b5de5','#f15bb5','#00bbf9'];
-const BRANDS    = [...new Set(RAW.map(d=>d.brand))].sort();
-const BC        = {};
-BRANDS.forEach((b,i)=>BC[b]=PALETTE[i%PALETTE.length]);
+const SEG_MAP = { first:'0.첫주문', active:'1.활성', ret:'2.이탈복귀' };
+const CAT_KO  = { CHICKEN:'치킨',FASTFOOD:'패스트푸드',SNACK:'분식',ZZIM_TANG:'찜/탕',CHINESE:'중식',BAEKBAN:'백반/죽',DOSIRAK:'도시락',JOKBAL:'족발/보쌈',PIZZA:'피자',CAFE:'카페',JAPANESE:'일식',WESTERN:'양식',NIGHTSNACK:'야식',MEAT:'육류',ASIAN:'아시안',CAFE_CHAIN:'카페(스타벅스)' };
+const PALETTE = ['#e63946','#457b9d','#2a9d8f','#e9c46a','#f4a261','#264653','#a8dadc','#06d6a0','#ef476f','#ffd166','#118ab2','#073b4c','#9b5de5','#f15bb5','#00bbf9','#00704a'];
+const BRANDS  = [...new Set(RAW.map(function(d){return d.brand;}))].sort();
+const BC      = {};
+BRANDS.forEach(function(b,i){ BC[b] = b==='스타벅스' ? '#00704a' : PALETTE[i%15]; });
 
-function getData(seg,md){ return RAW.filter(d=>d.seg===seg&&d.month_diff===md).sort((a,b)=>b.retention-a.retention); }
-function getSeries(b,seg){ return RAW.filter(d=>d.brand===b&&d.seg===seg).sort((a,b)=>a.month_diff-b.month_diff); }
+function getData(seg,md){ return RAW.filter(function(d){return d.seg===seg&&d.month_diff===md;}).sort(function(a,b){return b.retention-a.retention;}); }
+function getSeries(b,seg){ return RAW.filter(function(d){return d.brand===b&&d.seg===seg;}).sort(function(a,b){return a.month_diff-b.month_diff;}); }
 function fmt(n){ return (n||0).toLocaleString('ko-KR'); }
 function pct(n){ return (n||0).toFixed(1)+'%'; }
 function won(n){ return (n||0).toLocaleString('ko-KR')+'원'; }
@@ -5937,15 +6331,17 @@ function buildPanel(tabKey){
   const rows12 = getData(seg,12);
   const el = document.getElementById('panel-'+tabKey);
 
-  // 카드
+  // 카드 (잔존율 순위)
   let html = '<div class="section-title">M+12 브랜드 순위 (잔존율 기준)</div><div class="card-grid">';
   rows12.forEach(function(d,i){
-    const rc = i===0?'top1':i===1?'top2':i===2?'top3':(i>=rows12.length-2?'bot':'');
+    const isSB = d.brand==='스타벅스';
+    const rc = isSB ? 'sbcard' : (i===0?'top1':i===1?'top2':i===2?'top3':(i>=rows12.length-2?'bot':''));
     const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
     html += '<div class="card '+rc+'">'
+      +(isSB?'<div class="sb-tag">스타벅스</div>':'')
       +'<div class="rank">#'+(i+1)+' '+medal+'</div>'
       +'<div class="brand-name">'+d.brand+'</div>'
-      +'<div><span class="cat-badge">'+(CAT_KO[d.category]||d.category)+'</span></div>'
+      +'<div><span class="cat-badge'+(isSB?' sb':'')+'">'+( CAT_KO[d.category]||d.category)+'</span></div>'
       +'<div class="metric"><span class="label">잔존율(M+12)</span><span class="value" style="color:#0f3460">'+pct(d.retention)+'</span></div>'
       +'<div class="metric"><span class="label">누적 LTV</span><span class="value">'+won(d.cum_ltv)+'</span></div>'
       +'<div class="metric"><span class="label">누적 할인비용</span><span class="value">'+won(d.cum_dc)+'</span></div>'
@@ -5956,22 +6352,22 @@ function buildPanel(tabKey){
 
   const uid = tabKey;
   html += '<div class="section-title">잔존율 추이 (M+0 → M+12)</div>'
-    +'<div class="chart-full"><h3></h3><canvas id="c-ret-'+uid+'"></canvas></div>'
+    +'<div class="chart-full"><canvas id="c-ret-'+uid+'"></canvas></div>'
     +'<div class="section-title">누적 인당 주문금액(LTV) 추이</div>'
-    +'<div class="chart-full"><h3></h3><canvas id="c-ltv-'+uid+'"></canvas></div>'
+    +'<div class="chart-full"><canvas id="c-ltv-'+uid+'"></canvas></div>'
     +'<div class="section-title">M+12 브랜드 비교</div>'
     +'<div class="chart-row">'
     +'<div class="chart-box"><h3>잔존율 (M+12)</h3><canvas id="c-rbar-'+uid+'"></canvas></div>'
     +'<div class="chart-box"><h3>누적 FLGP (M+12)</h3><canvas id="c-fbar-'+uid+'"></canvas></div>'
     +'</div>';
 
-  // 테이블
   const byLTV = [...rows12].sort(function(a,b){return b.cum_ltv-a.cum_ltv;});
-  html += '<div class="section-title">상세 데이터 (LTV 기준 정렬, M+12)</div><table>'
-    +'<thead><tr><th>브랜드</th><th>카테고리</th><th>잔존율</th><th>누적 LTV</th><th>누적 할인비용</th><th>누적 FLGP</th></tr></thead><tbody>';
+  html += '<div class="section-title">상세 데이터 (LTV 기준 정렬, M+12)</div>'
+    +'<table><thead><tr><th>브랜드</th><th>카테고리</th><th>잔존율</th><th>누적 LTV</th><th>누적 할인비용</th><th>누적 FLGP</th></tr></thead><tbody>';
   byLTV.forEach(function(d){
-    html += '<tr>'
-      +'<td class="td-brand">'+d.brand+'</td>'
+    const isSB = d.brand==='스타벅스';
+    html += '<tr'+(isSB?' class="sb-row"':'')+'>'
+      +'<td class="td-brand">'+(isSB?'🟢 ':'')+d.brand+'</td>'
       +'<td class="td-cat">'+(CAT_KO[d.category]||d.category)+'</td>'
       +'<td>'+pct(d.retention)+'</td>'
       +'<td>'+won(d.cum_ltv)+'</td>'
@@ -5980,10 +6376,8 @@ function buildPanel(tabKey){
       +'</tr>';
   });
   html += '</tbody></table>';
-
   el.innerHTML = html;
 
-  // 차트 그리기
   const months = [0,1,2,3,4,5,6,7,8,9,10,11,12];
 
   if(charts['ret-'+uid]) charts['ret-'+uid].destroy();
@@ -5992,14 +6386,14 @@ function buildPanel(tabKey){
     data:{
       labels:months.map(function(m){return 'M+'+m;}),
       datasets:BRANDS.map(function(b){
-        var s=getSeries(b,seg);
+        var s=getSeries(b,seg); var isSB=b==='스타벅스';
         return { label:b, data:months.map(function(m){var r=s.find(function(x){return x.month_diff===m;}); return r?r.retention:null;}),
-          borderColor:BC[b], backgroundColor:BC[b]+'22', borderWidth:2, pointRadius:3, tension:0.3, spanGaps:false };
+          borderColor:BC[b], borderWidth:isSB?3:1.5, pointRadius:isSB?4:2,
+          borderDash:isSB?[]:[4,2], tension:0.3, spanGaps:false, fill:false };
       })
     },
-    options:{
-      responsive:true,
-      plugins:{ legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:8}},
+    options:{ responsive:true,
+      plugins:{ legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:6}},
         tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toFixed(1)+'%';}}} },
       scales:{ y:{title:{display:true,text:'잔존율(%)'},min:0}, x:{grid:{display:false}} }
     }
@@ -6011,14 +6405,14 @@ function buildPanel(tabKey){
     data:{
       labels:months.map(function(m){return 'M+'+m;}),
       datasets:BRANDS.map(function(b){
-        var s=getSeries(b,seg);
+        var s=getSeries(b,seg); var isSB=b==='스타벅스';
         return { label:b, data:months.map(function(m){var r=s.find(function(x){return x.month_diff===m;}); return r?r.cum_ltv:null;}),
-          borderColor:BC[b], backgroundColor:BC[b]+'22', borderWidth:2, pointRadius:3, tension:0.3, spanGaps:false };
+          borderColor:BC[b], borderWidth:isSB?3:1.5, pointRadius:isSB?4:2,
+          borderDash:isSB?[]:[4,2], tension:0.3, spanGaps:false, fill:false };
       })
     },
-    options:{
-      responsive:true,
-      plugins:{ legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:8}},
+    options:{ responsive:true,
+      plugins:{ legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:6}},
         tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toLocaleString('ko-KR')+'원';}}} },
       scales:{ y:{title:{display:true,text:'누적 LTV(원)'},ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}}, x:{grid:{display:false}} }
     }
@@ -6028,37 +6422,30 @@ function buildPanel(tabKey){
   if(charts['rbar-'+uid]) charts['rbar-'+uid].destroy();
   charts['rbar-'+uid] = new Chart(document.getElementById('c-rbar-'+uid),{
     type:'bar',
-    data:{
-      labels:retS.map(function(d){return d.brand;}),
-      datasets:[{data:retS.map(function(d){return d.retention;}), backgroundColor:retS.map(function(d){return BC[d.brand]+'cc';})}]
-    },
-    options:{
-      indexAxis:'y', responsive:true,
-      plugins:{legend:{display:false}, tooltip:{callbacks:{label:function(c){return (c.parsed.x||0).toFixed(1)+'%';}}}},
-      scales:{x:{title:{display:true,text:'%'},min:0}, y:{ticks:{font:{size:11}}}}
-    }
+    data:{ labels:retS.map(function(d){return d.brand;}),
+      datasets:[{data:retS.map(function(d){return d.retention;}),
+        backgroundColor:retS.map(function(d){return d.brand==='스타벅스'?'#00704acc':BC[d.brand]+'cc';})}] },
+    options:{ indexAxis:'y', responsive:true,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return (c.parsed.x||0).toFixed(1)+'%';}}}},
+      scales:{x:{title:{display:true,text:'%'},min:0},y:{ticks:{font:{size:11}}}} }
   });
 
   var flS=[...rows12].sort(function(a,b){return b.cum_flgp-a.cum_flgp;});
   if(charts['fbar-'+uid]) charts['fbar-'+uid].destroy();
   charts['fbar-'+uid] = new Chart(document.getElementById('c-fbar-'+uid),{
     type:'bar',
-    data:{
-      labels:flS.map(function(d){return d.brand;}),
-      datasets:[{data:flS.map(function(d){return d.cum_flgp;}), backgroundColor:flS.map(function(d){return d.cum_flgp>=0?BC[d.brand]+'cc':'#fca5a5';})}]
-    },
-    options:{
-      indexAxis:'y', responsive:true,
-      plugins:{legend:{display:false}, tooltip:{callbacks:{label:function(c){return (c.parsed.x||0).toLocaleString('ko-KR')+'원';}}}},
-      scales:{x:{title:{display:true,text:'원'},ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}}, y:{ticks:{font:{size:11}}}}
-    }
+    data:{ labels:flS.map(function(d){return d.brand;}),
+      datasets:[{data:flS.map(function(d){return d.cum_flgp;}),
+        backgroundColor:flS.map(function(d){return d.brand==='스타벅스'?'#00704acc':(d.cum_flgp>=0?BC[d.brand]+'cc':'#fca5a5');})}] },
+    options:{ indexAxis:'y', responsive:true,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return (c.parsed.x||0).toLocaleString('ko-KR')+'원';}}}},
+      scales:{x:{title:{display:true,text:'원'},ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}},y:{ticks:{font:{size:11}}}} }
   });
 }
 
 function switchTab(key){
   document.querySelectorAll('.tab').forEach(function(t,i){
-    var keys=['first','active','ret'];
-    t.classList.toggle('active',keys[i]===key);
+    t.classList.toggle('active',['first','active','ret'][i]===key);
   });
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
   document.getElementById('panel-'+key).classList.add('active');
@@ -6067,6 +6454,4 @@ function switchTab(key){
 buildPanel('first');
 buildPanel('active');
 buildPanel('ret');
-</script>
-</body>
-</html>
+</script></body></html>
