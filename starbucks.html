@@ -1,0 +1,6616 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>스타벅스 LTV 분석</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Apple SD Gothic Neo',sans-serif; background:#f0f2f5; color:#1a1a2e; }
+  header { background:linear-gradient(135deg,#1a1a2e,#00704a); color:white; padding:28px 40px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:22px; font-weight:700; }
+  header p  { font-size:13px; color:#a8d8c0; margin-top:6px; }
+  header a  { color:white; font-size:12px; opacity:.7; text-decoration:none; border:1px solid rgba(255,255,255,.4); padding:6px 14px; border-radius:20px; }
+  header a:hover { opacity:1; }
+  .note { background:#fffbe6; border-left:4px solid #f59e0b; padding:10px 16px; margin:16px 40px 0; font-size:12px; color:#555; border-radius:4px; }
+
+  /* 페이지 탭 */
+  .page-tabs { display:flex; gap:4px; padding:20px 40px 0; }
+  .page-tab  { padding:10px 28px; border-radius:8px 8px 0 0; cursor:pointer; font-size:14px; font-weight:600; background:#dde2ec; color:#555; }
+  .page-tab.active { background:white; color:#00704a; box-shadow:0 -2px 8px rgba(0,0,0,.08); }
+  .page-panel { display:none; background:white; margin:0 40px; padding:28px; border-radius:0 8px 8px 8px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+  .page-panel.active { display:block; }
+
+  /* 세그 탭 */
+  .seg-tabs { display:flex; gap:6px; margin-bottom:20px; }
+  .seg-tab  { padding:7px 20px; border-radius:20px; cursor:pointer; font-size:13px; font-weight:600; background:#f0f2f5; color:#666; border:1px solid #dde2ec; }
+  .seg-tab.active { background:#00704a; color:white; border-color:#00704a; }
+
+  .seg-panel { display:none; }
+  .seg-panel.active { display:block; }
+
+  .section-title { font-size:15px; font-weight:700; color:#0f3460; margin:24px 0 12px; padding-left:12px; border-left:4px solid #00704a; }
+
+  /* 스코어카드 */
+  .scorecard { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
+  .sc { background:#f8f9fc; border-radius:10px; padding:16px; border:1px solid #e2e8f0; text-align:center; }
+  .sc.sb { border-top:3px solid #00704a; }
+  .sc.bb { border-top:3px solid #f4a261; }
+  .sc-label { font-size:11px; color:#888; margin-bottom:6px; }
+  .sc-val   { font-size:22px; font-weight:800; color:#1a1a2e; }
+  .sc-sub   { font-size:11px; color:#888; margin-top:2px; }
+  .sc-diff  { font-size:12px; font-weight:700; margin-top:4px; }
+  .up   { color:#059669; }
+  .dn   { color:#dc2626; }
+  .neu  { color:#888; }
+
+  /* 랭킹 바 */
+  .rank-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
+  .rank-box  { background:#f8f9fc; border-radius:8px; padding:16px; border:1px solid #e2e8f0; }
+  .rank-box h3 { font-size:13px; color:#555; margin-bottom:14px; text-align:center; font-weight:600; }
+  .rank-row  { display:flex; align-items:center; gap:8px; margin-bottom:7px; font-size:12px; }
+  .rank-num  { width:22px; text-align:right; color:#aaa; font-size:11px; flex-shrink:0; }
+  .rank-name { width:90px; font-weight:600; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rank-bar-wrap { flex:1; background:#eee; border-radius:4px; height:14px; }
+  .rank-bar  { height:14px; border-radius:4px; }
+  .rank-val  { width:70px; text-align:right; font-weight:700; flex-shrink:0; }
+  .rank-row.hl .rank-name { color:#00704a; }
+  .rank-row.hl .rank-bar  { background:#00704a; }
+  .rank-row.hl2 .rank-name { color:#f4a261; }
+  .rank-row.hl2 .rank-bar  { background:#f4a261; }
+  .rank-row:not(.hl):not(.hl2) .rank-bar { background:#ccd; }
+
+  /* 차트 */
+  .chart-row { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
+  .chart-box { background:#f8f9fc; border-radius:8px; padding:16px; border:1px solid #e2e8f0; }
+  .chart-box h3 { font-size:13px; color:#555; margin-bottom:12px; text-align:center; }
+  .chart-full { background:#f8f9fc; border-radius:8px; padding:16px; border:1px solid #e2e8f0; margin-bottom:24px; }
+  .chart-full h3 { font-size:13px; color:#555; margin-bottom:12px; text-align:center; }
+  canvas { max-height:300px; }
+
+  /* 테이블 */
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { background:#1a1a2e; color:white; padding:9px 12px; text-align:center; font-weight:600; }
+  td { padding:8px 12px; text-align:center; border-bottom:1px solid #eee; }
+  tr:hover td { background:#f0f4ff; }
+  tr.sb-row td { background:#f0faf6 !important; }
+  tr.bb-row td { background:#fff8f0 !important; }
+  .td-brand { text-align:left; font-weight:600; }
+  .pos { color:#059669; font-weight:700; }
+  .neg { color:#dc2626; font-weight:700; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🟢 스타벅스 LTV 분석 대시보드</h1>
+    <p>카테고리 TOP1 비교 · 빽다방 1:1 비교 | 코호트 25/03~26/03 | M+12 누적</p>
+  </div>
+  <a href="index.html">← 전체 브랜드 대시보드</a>
+</header>
+
+<div class="note">⚠️ M+12 지표는 <strong>25/03~25/05 코호트 기준</strong>. 할인비용: 우형부담(쿠폰+HVA+MFO+배민클럽)</div>
+
+<div class="page-tabs">
+  <div class="page-tab active" onclick="switchPage('p1')">① 스타벅스 vs 카테고리 TOP1</div>
+  <div class="page-tab" onclick="switchPage('p2')">② 스타벅스 vs 빽다방 1:1</div>
+</div>
+
+<div id="p1" class="page-panel active"></div>
+<div id="p2" class="page-panel"></div>
+<br>
+
+<script>
+const RAW =[
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  50221,
+        "cum_dc":  13044,
+        "cum_flgp":  -5084
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  39.87,
+        "cum_ltv":  81353,
+        "cum_dc":  16236,
+        "cum_flgp":  -4404
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  33,
+        "cum_ltv":  106889,
+        "cum_dc":  18504,
+        "cum_flgp":  -3441
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  31.32,
+        "cum_ltv":  131922,
+        "cum_dc":  20744,
+        "cum_flgp":  -2525
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  31.07,
+        "cum_ltv":  157017,
+        "cum_dc":  22958,
+        "cum_flgp":  -1489
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  31.08,
+        "cum_ltv":  182516,
+        "cum_dc":  25311,
+        "cum_flgp":  -424
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  31.45,
+        "cum_ltv":  208878,
+        "cum_dc":  27948,
+        "cum_flgp":  619
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  30.91,
+        "cum_ltv":  234465,
+        "cum_dc":  30511,
+        "cum_flgp":  1619
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  29.12,
+        "cum_ltv":  257131,
+        "cum_dc":  32707,
+        "cum_flgp":  2564
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  27.75,
+        "cum_ltv":  278684,
+        "cum_dc":  34742,
+        "cum_flgp":  3380
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  28.18,
+        "cum_ltv":  300847,
+        "cum_dc":  36792,
+        "cum_flgp":  4325
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  28.9,
+        "cum_ltv":  322959,
+        "cum_dc":  38905,
+        "cum_flgp":  5361
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  28.4,
+        "cum_ltv":  345505,
+        "cum_dc":  41156,
+        "cum_flgp":  6461
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  130069,
+        "cum_dc":  10281,
+        "cum_flgp":  4443
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  85.88,
+        "cum_ltv":  250903,
+        "cum_dc":  19235,
+        "cum_flgp":  9214
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  83.1,
+        "cum_ltv":  365490,
+        "cum_dc":  27822,
+        "cum_flgp":  14074
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  81.42,
+        "cum_ltv":  478381,
+        "cum_dc":  36485,
+        "cum_flgp":  19158
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  81.17,
+        "cum_ltv":  592245,
+        "cum_dc":  45431,
+        "cum_flgp":  24697
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  80.16,
+        "cum_ltv":  704082,
+        "cum_dc":  54540,
+        "cum_flgp":  29969
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  79.3,
+        "cum_ltv":  813989,
+        "cum_dc":  63657,
+        "cum_flgp":  35113
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  78.29,
+        "cum_ltv":  921770,
+        "cum_dc":  72675,
+        "cum_flgp":  40080
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  77.26,
+        "cum_ltv":  1026641,
+        "cum_dc":  81580,
+        "cum_flgp":  44891
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  75.44,
+        "cum_ltv":  1128875,
+        "cum_dc":  90264,
+        "cum_flgp":  49449
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  75.36,
+        "cum_ltv":  1228121,
+        "cum_dc":  98554,
+        "cum_flgp":  54298
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  74.11,
+        "cum_ltv":  1321421,
+        "cum_dc":  106467,
+        "cum_flgp":  59287
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  71.96,
+        "cum_ltv":  1408533,
+        "cum_dc":  113976,
+        "cum_flgp":  64238
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  47185,
+        "cum_dc":  5628,
+        "cum_flgp":  665
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  58.8,
+        "cum_ltv":  83725,
+        "cum_dc":  8587,
+        "cum_flgp":  1956
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  55.5,
+        "cum_ltv":  119104,
+        "cum_dc":  11403,
+        "cum_flgp":  3369
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  54.59,
+        "cum_ltv":  155058,
+        "cum_dc":  14333,
+        "cum_flgp":  4892
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  54.75,
+        "cum_ltv":  191967,
+        "cum_dc":  17447,
+        "cum_flgp":  6544
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  54.4,
+        "cum_ltv":  228970,
+        "cum_dc":  20717,
+        "cum_flgp":  8139
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  54.35,
+        "cum_ltv":  266235,
+        "cum_dc":  24140,
+        "cum_flgp":  9703
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  54.09,
+        "cum_ltv":  303988,
+        "cum_dc":  27710,
+        "cum_flgp":  11204
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  53.7,
+        "cum_ltv":  342011,
+        "cum_dc":  31348,
+        "cum_flgp":  12701
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  52.06,
+        "cum_ltv":  379041,
+        "cum_dc":  34830,
+        "cum_flgp":  14125
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  51.86,
+        "cum_ltv":  415719,
+        "cum_dc":  38262,
+        "cum_flgp":  15677
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  51.84,
+        "cum_ltv":  452079,
+        "cum_dc":  41850,
+        "cum_flgp":  17329
+    },
+    {
+        "brand":  "BHC",
+        "category":  "CHICKEN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  49.77,
+        "cum_ltv":  486843,
+        "cum_dc":  45398,
+        "cum_flgp":  18998
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  63656,
+        "cum_dc":  10149,
+        "cum_flgp":  -2974
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  34.71,
+        "cum_ltv":  93141,
+        "cum_dc":  11882,
+        "cum_flgp":  -1763
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  28.72,
+        "cum_ltv":  118620,
+        "cum_dc":  13079,
+        "cum_flgp":  -249
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  27.91,
+        "cum_ltv":  142725,
+        "cum_dc":  14307,
+        "cum_flgp":  1211
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  26.11,
+        "cum_ltv":  166864,
+        "cum_dc":  15505,
+        "cum_flgp":  2872
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  25.8,
+        "cum_ltv":  190605,
+        "cum_dc":  16786,
+        "cum_flgp":  4417
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  25.51,
+        "cum_ltv":  214116,
+        "cum_dc":  18157,
+        "cum_flgp":  5948
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  26.04,
+        "cum_ltv":  238008,
+        "cum_dc":  19650,
+        "cum_flgp":  7439
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  25.42,
+        "cum_ltv":  260414,
+        "cum_dc":  21032,
+        "cum_flgp":  8860
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  24.85,
+        "cum_ltv":  283271,
+        "cum_dc":  22398,
+        "cum_flgp":  10210
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  24.97,
+        "cum_ltv":  305149,
+        "cum_dc":  23746,
+        "cum_flgp":  11572
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  25.13,
+        "cum_ltv":  327038,
+        "cum_dc":  25202,
+        "cum_flgp":  13010
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  26.09,
+        "cum_ltv":  348873,
+        "cum_dc":  26693,
+        "cum_flgp":  14461
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  184361,
+        "cum_dc":  6408,
+        "cum_flgp":  9847
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  86.78,
+        "cum_ltv":  344852,
+        "cum_dc":  13063,
+        "cum_flgp":  18625
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  84.38,
+        "cum_ltv":  497523,
+        "cum_dc":  19621,
+        "cum_flgp":  27566
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  83.11,
+        "cum_ltv":  647214,
+        "cum_dc":  26328,
+        "cum_flgp":  37224
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  82.08,
+        "cum_ltv":  801044,
+        "cum_dc":  33694,
+        "cum_flgp":  48044
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  81.29,
+        "cum_ltv":  957128,
+        "cum_dc":  41332,
+        "cum_flgp":  59188
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  80.05,
+        "cum_ltv":  1093372,
+        "cum_dc":  48433,
+        "cum_flgp":  68665
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  79.16,
+        "cum_ltv":  1213989,
+        "cum_dc":  55190,
+        "cum_flgp":  76518
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  78.31,
+        "cum_ltv":  1332540,
+        "cum_dc":  61912,
+        "cum_flgp":  84128
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  77.14,
+        "cum_ltv":  1448311,
+        "cum_dc":  68477,
+        "cum_flgp":  91347
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  76.28,
+        "cum_ltv":  1560084,
+        "cum_dc":  74869,
+        "cum_flgp":  98595
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  74.9,
+        "cum_ltv":  1666640,
+        "cum_dc":  81135,
+        "cum_flgp":  105927
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  73.01,
+        "cum_ltv":  1767537,
+        "cum_dc":  87269,
+        "cum_flgp":  113095
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  66081,
+        "cum_dc":  2418,
+        "cum_flgp":  2743
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  57.04,
+        "cum_ltv":  105012,
+        "cum_dc":  4115,
+        "cum_flgp":  4698
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  54.32,
+        "cum_ltv":  142802,
+        "cum_dc":  5824,
+        "cum_flgp":  6817
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  53.67,
+        "cum_ltv":  180937,
+        "cum_dc":  7668,
+        "cum_flgp":  9128
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  53.09,
+        "cum_ltv":  219215,
+        "cum_dc":  9647,
+        "cum_flgp":  11645
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  52.43,
+        "cum_ltv":  257218,
+        "cum_dc":  11717,
+        "cum_flgp":  14112
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  52.17,
+        "cum_ltv":  295414,
+        "cum_dc":  13879,
+        "cum_flgp":  16563
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  52.16,
+        "cum_ltv":  334082,
+        "cum_dc":  16160,
+        "cum_flgp":  18971
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  51.68,
+        "cum_ltv":  373094,
+        "cum_dc":  18491,
+        "cum_flgp":  21397
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  51.06,
+        "cum_ltv":  411602,
+        "cum_dc":  20814,
+        "cum_flgp":  23729
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  49.88,
+        "cum_ltv":  449092,
+        "cum_dc":  23073,
+        "cum_flgp":  26118
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  48.66,
+        "cum_ltv":  484853,
+        "cum_dc":  25321,
+        "cum_flgp":  28506
+    },
+    {
+        "brand":  "가장맛있는족발",
+        "category":  "JOKBAL",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  47.14,
+        "cum_ltv":  519845,
+        "cum_dc":  27608,
+        "cum_flgp":  30912
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  38970,
+        "cum_dc":  11290,
+        "cum_flgp":  -5088
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  41.74,
+        "cum_ltv":  66503,
+        "cum_dc":  13564,
+        "cum_flgp":  -4363
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  36.07,
+        "cum_ltv":  90208,
+        "cum_dc":  15121,
+        "cum_flgp":  -3233
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  35.02,
+        "cum_ltv":  113404,
+        "cum_dc":  16700,
+        "cum_flgp":  -2044
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  34.43,
+        "cum_ltv":  136418,
+        "cum_dc":  18330,
+        "cum_flgp":  -770
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  34.86,
+        "cum_ltv":  159825,
+        "cum_dc":  20073,
+        "cum_flgp":  505
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  36.17,
+        "cum_ltv":  184123,
+        "cum_dc":  22010,
+        "cum_flgp":  1749
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  36.42,
+        "cum_ltv":  209142,
+        "cum_dc":  24075,
+        "cum_flgp":  2957
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  36.34,
+        "cum_ltv":  233719,
+        "cum_dc":  26098,
+        "cum_flgp":  4145
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  35.51,
+        "cum_ltv":  257286,
+        "cum_dc":  28024,
+        "cum_flgp":  5221
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  34.72,
+        "cum_ltv":  280080,
+        "cum_dc":  29879,
+        "cum_flgp":  6350
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  34.14,
+        "cum_ltv":  302210,
+        "cum_dc":  31740,
+        "cum_flgp":  7557
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  33.46,
+        "cum_ltv":  324552,
+        "cum_dc":  33736,
+        "cum_flgp":  8804
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  134691,
+        "cum_dc":  7823,
+        "cum_flgp":  5431
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  87.45,
+        "cum_ltv":  265828,
+        "cum_dc":  15942,
+        "cum_flgp":  11141
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  84.95,
+        "cum_ltv":  390215,
+        "cum_dc":  23866,
+        "cum_flgp":  17037
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  83.64,
+        "cum_ltv":  511777,
+        "cum_dc":  31896,
+        "cum_flgp":  23170
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  82.63,
+        "cum_ltv":  630881,
+        "cum_dc":  40032,
+        "cum_flgp":  29642
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  81.82,
+        "cum_ltv":  748181,
+        "cum_dc":  48277,
+        "cum_flgp":  35960
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  80.73,
+        "cum_ltv":  862519,
+        "cum_dc":  56421,
+        "cum_flgp":  42156
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  80.02,
+        "cum_ltv":  976229,
+        "cum_dc":  64591,
+        "cum_flgp":  48189
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  78.97,
+        "cum_ltv":  1087326,
+        "cum_dc":  72638,
+        "cum_flgp":  53937
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  78,
+        "cum_ltv":  1196406,
+        "cum_dc":  80528,
+        "cum_flgp":  59337
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  76.96,
+        "cum_ltv":  1302235,
+        "cum_dc":  88235,
+        "cum_flgp":  64953
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  75.72,
+        "cum_ltv":  1402484,
+        "cum_dc":  95733,
+        "cum_flgp":  70802
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  73.74,
+        "cum_ltv":  1496269,
+        "cum_dc":  102981,
+        "cum_flgp":  76571
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  40654,
+        "cum_dc":  2907,
+        "cum_flgp":  1126
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  61.39,
+        "cum_ltv":  77977,
+        "cum_dc":  5101,
+        "cum_flgp":  2691
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  58.07,
+        "cum_ltv":  114206,
+        "cum_dc":  7257,
+        "cum_flgp":  4444
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  57.51,
+        "cum_ltv":  151254,
+        "cum_dc":  9585,
+        "cum_flgp":  6360
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  56.86,
+        "cum_ltv":  188751,
+        "cum_dc":  12061,
+        "cum_flgp":  8439
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  56.43,
+        "cum_ltv":  226324,
+        "cum_dc":  14658,
+        "cum_flgp":  10487
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  56.53,
+        "cum_ltv":  264538,
+        "cum_dc":  17379,
+        "cum_flgp":  12532
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  56.81,
+        "cum_ltv":  303870,
+        "cum_dc":  20272,
+        "cum_flgp":  14543
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  56.52,
+        "cum_ltv":  343660,
+        "cum_dc":  23235,
+        "cum_flgp":  16540
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  55.96,
+        "cum_ltv":  383488,
+        "cum_dc":  26190,
+        "cum_flgp":  18487
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  54.47,
+        "cum_ltv":  421742,
+        "cum_dc":  29056,
+        "cum_flgp":  20502
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  53.66,
+        "cum_ltv":  459284,
+        "cum_dc":  31975,
+        "cum_flgp":  22639
+    },
+    {
+        "brand":  "동대문엽기떡볶이",
+        "category":  "SNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  51.8,
+        "cum_ltv":  495186,
+        "cum_dc":  34865,
+        "cum_flgp":  24766
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  61279,
+        "cum_dc":  12434,
+        "cum_flgp":  -3916
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  42.18,
+        "cum_ltv":  100528,
+        "cum_dc":  15584,
+        "cum_flgp":  -2718
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  35.08,
+        "cum_ltv":  132292,
+        "cum_dc":  17769,
+        "cum_flgp":  -1304
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  33.12,
+        "cum_ltv":  162708,
+        "cum_dc":  19963,
+        "cum_flgp":  98
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  31.96,
+        "cum_ltv":  192449,
+        "cum_dc":  22103,
+        "cum_flgp":  1633
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  32.31,
+        "cum_ltv":  222802,
+        "cum_dc":  24380,
+        "cum_flgp":  3206
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  32.5,
+        "cum_ltv":  253173,
+        "cum_dc":  26826,
+        "cum_flgp":  4736
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  32.17,
+        "cum_ltv":  283755,
+        "cum_dc":  29398,
+        "cum_flgp":  6185
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  31.88,
+        "cum_ltv":  313004,
+        "cum_dc":  31801,
+        "cum_flgp":  7600
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  32.24,
+        "cum_ltv":  341414,
+        "cum_dc":  34134,
+        "cum_flgp":  8798
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  31.36,
+        "cum_ltv":  369589,
+        "cum_dc":  36493,
+        "cum_flgp":  10093
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  31.48,
+        "cum_ltv":  398114,
+        "cum_dc":  38995,
+        "cum_flgp":  11561
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  31.78,
+        "cum_ltv":  427638,
+        "cum_dc":  41749,
+        "cum_flgp":  13120
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  169292,
+        "cum_dc":  10258,
+        "cum_flgp":  6630
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  88.26,
+        "cum_ltv":  320943,
+        "cum_dc":  19643,
+        "cum_flgp":  12906
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  85.81,
+        "cum_ltv":  463992,
+        "cum_dc":  28669,
+        "cum_flgp":  19367
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  84.51,
+        "cum_ltv":  604435,
+        "cum_dc":  37798,
+        "cum_flgp":  26278
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  83.41,
+        "cum_ltv":  742781,
+        "cum_dc":  47047,
+        "cum_flgp":  33715
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  82.83,
+        "cum_ltv":  880448,
+        "cum_dc":  56548,
+        "cum_flgp":  41078
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  81.28,
+        "cum_ltv":  1011527,
+        "cum_dc":  65653,
+        "cum_flgp":  48235
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  80.7,
+        "cum_ltv":  1142301,
+        "cum_dc":  74914,
+        "cum_flgp":  55227
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  79.26,
+        "cum_ltv":  1268010,
+        "cum_dc":  83934,
+        "cum_flgp":  61691
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  78.69,
+        "cum_ltv":  1393019,
+        "cum_dc":  92918,
+        "cum_flgp":  67600
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  77.61,
+        "cum_ltv":  1512996,
+        "cum_dc":  101574,
+        "cum_flgp":  73651
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  76.49,
+        "cum_ltv":  1626855,
+        "cum_dc":  110249,
+        "cum_flgp":  79951
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  74.79,
+        "cum_ltv":  1734503,
+        "cum_dc":  119081,
+        "cum_flgp":  86101
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  56996,
+        "cum_dc":  4340,
+        "cum_flgp":  1662
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  61.4,
+        "cum_ltv":  99481,
+        "cum_dc":  6867,
+        "cum_flgp":  3386
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  57.84,
+        "cum_ltv":  140193,
+        "cum_dc":  9274,
+        "cum_flgp":  5226
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  57.32,
+        "cum_ltv":  181871,
+        "cum_dc":  11818,
+        "cum_flgp":  7303
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  56.56,
+        "cum_ltv":  223755,
+        "cum_dc":  14526,
+        "cum_flgp":  9552
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  56.37,
+        "cum_ltv":  266036,
+        "cum_dc":  17397,
+        "cum_flgp":  11812
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  56.09,
+        "cum_ltv":  308381,
+        "cum_dc":  20410,
+        "cum_flgp":  14039
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  55.97,
+        "cum_ltv":  351403,
+        "cum_dc":  23600,
+        "cum_flgp":  16219
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  55.89,
+        "cum_ltv":  395138,
+        "cum_dc":  26918,
+        "cum_flgp":  18298
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  55.32,
+        "cum_ltv":  438963,
+        "cum_dc":  30215,
+        "cum_flgp":  20221
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  54.62,
+        "cum_ltv":  481652,
+        "cum_dc":  33441,
+        "cum_flgp":  22243
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  54.23,
+        "cum_ltv":  523689,
+        "cum_dc":  36934,
+        "cum_flgp":  24373
+    },
+    {
+        "brand":  "두찜",
+        "category":  "ZZIM_TANG",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  53.71,
+        "cum_ltv":  565712,
+        "cum_dc":  40648,
+        "cum_flgp":  26590
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  50088,
+        "cum_dc":  9699,
+        "cum_flgp":  -3519
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  45.92,
+        "cum_ltv":  95720,
+        "cum_dc":  12475,
+        "cum_flgp":  -1708
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  39.26,
+        "cum_ltv":  134544,
+        "cum_dc":  14569,
+        "cum_flgp":  335
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  37.56,
+        "cum_ltv":  171990,
+        "cum_dc":  16689,
+        "cum_flgp":  2454
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  36.74,
+        "cum_ltv":  208910,
+        "cum_dc":  18795,
+        "cum_flgp":  4717
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  36.91,
+        "cum_ltv":  246287,
+        "cum_dc":  21014,
+        "cum_flgp":  7008
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  36.52,
+        "cum_ltv":  283475,
+        "cum_dc":  23313,
+        "cum_flgp":  9297
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  37.03,
+        "cum_ltv":  321022,
+        "cum_dc":  25740,
+        "cum_flgp":  11549
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  36.12,
+        "cum_ltv":  356916,
+        "cum_dc":  28082,
+        "cum_flgp":  13672
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  35.38,
+        "cum_ltv":  391006,
+        "cum_dc":  30333,
+        "cum_flgp":  15579
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  34.36,
+        "cum_ltv":  424552,
+        "cum_dc":  32537,
+        "cum_flgp":  17541
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  34.45,
+        "cum_ltv":  457086,
+        "cum_dc":  34757,
+        "cum_flgp":  19589
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  33.71,
+        "cum_ltv":  488945,
+        "cum_dc":  37029,
+        "cum_flgp":  21664
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  185247,
+        "cum_dc":  9514,
+        "cum_flgp":  7451
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  91.46,
+        "cum_ltv":  365251,
+        "cum_dc":  19476,
+        "cum_flgp":  15796
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  89.11,
+        "cum_ltv":  535734,
+        "cum_dc":  29247,
+        "cum_flgp":  24390
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  87.7,
+        "cum_ltv":  702899,
+        "cum_dc":  39159,
+        "cum_flgp":  33493
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  86.62,
+        "cum_ltv":  868472,
+        "cum_dc":  49260,
+        "cum_flgp":  43328
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  85.91,
+        "cum_ltv":  1033025,
+        "cum_dc":  59608,
+        "cum_flgp":  53053
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  84.71,
+        "cum_ltv":  1192934,
+        "cum_dc":  69812,
+        "cum_flgp":  62624
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  83.86,
+        "cum_ltv":  1350697,
+        "cum_dc":  79998,
+        "cum_flgp":  72017
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  82.74,
+        "cum_ltv":  1504403,
+        "cum_dc":  90007,
+        "cum_flgp":  81034
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  81.66,
+        "cum_ltv":  1655081,
+        "cum_dc":  99791,
+        "cum_flgp":  89596
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  81.02,
+        "cum_ltv":  1802376,
+        "cum_dc":  109405,
+        "cum_flgp":  98413
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  79.67,
+        "cum_ltv":  1940699,
+        "cum_dc":  118650,
+        "cum_flgp":  107364
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  78.24,
+        "cum_ltv":  2072477,
+        "cum_dc":  127753,
+        "cum_flgp":  116268
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  46960,
+        "cum_dc":  2580,
+        "cum_flgp":  1404
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  65,
+        "cum_ltv":  93896,
+        "cum_dc":  4883,
+        "cum_flgp":  3614
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  61.34,
+        "cum_ltv":  139688,
+        "cum_dc":  7210,
+        "cum_flgp":  6033
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  60.45,
+        "cum_ltv":  186488,
+        "cum_dc":  9740,
+        "cum_flgp":  8690
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  59.47,
+        "cum_ltv":  233746,
+        "cum_dc":  12429,
+        "cum_flgp":  11567
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  59.18,
+        "cum_ltv":  281712,
+        "cum_dc":  15281,
+        "cum_flgp":  14475
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  58.66,
+        "cum_ltv":  329692,
+        "cum_dc":  18253,
+        "cum_flgp":  17367
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  58.59,
+        "cum_ltv":  378942,
+        "cum_dc":  21413,
+        "cum_flgp":  20263
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  58.05,
+        "cum_ltv":  428469,
+        "cum_dc":  24640,
+        "cum_flgp":  23128
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  57.14,
+        "cum_ltv":  477643,
+        "cum_dc":  27833,
+        "cum_flgp":  25911
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  56.5,
+        "cum_ltv":  526493,
+        "cum_dc":  31050,
+        "cum_flgp":  28825
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  55.43,
+        "cum_ltv":  573754,
+        "cum_dc":  34296,
+        "cum_flgp":  31812
+    },
+    {
+        "brand":  "롯데리아",
+        "category":  "FASTFOOD",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  54.2,
+        "cum_ltv":  619642,
+        "cum_dc":  37597,
+        "cum_flgp":  34801
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  50468,
+        "cum_dc":  10412,
+        "cum_flgp":  -4337
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  44.27,
+        "cum_ltv":  89716,
+        "cum_dc":  13563,
+        "cum_flgp":  -3241
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  37.67,
+        "cum_ltv":  123070,
+        "cum_dc":  15839,
+        "cum_flgp":  -1525
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  35.7,
+        "cum_ltv":  155045,
+        "cum_dc":  18221,
+        "cum_flgp":  -75
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  35.01,
+        "cum_ltv":  188076,
+        "cum_dc":  20723,
+        "cum_flgp":  1618
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  29.57,
+        "cum_ltv":  214829,
+        "cum_dc":  22650,
+        "cum_flgp":  3143
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  32.66,
+        "cum_ltv":  247139,
+        "cum_dc":  25837,
+        "cum_flgp":  3646
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  36.63,
+        "cum_ltv":  281207,
+        "cum_dc":  28793,
+        "cum_flgp":  5045
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  35.29,
+        "cum_ltv":  316604,
+        "cum_dc":  31555,
+        "cum_flgp":  6970
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  32.65,
+        "cum_ltv":  347646,
+        "cum_dc":  34386,
+        "cum_flgp":  8501
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  30.26,
+        "cum_ltv":  373138,
+        "cum_dc":  36394,
+        "cum_flgp":  9821
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  29.57,
+        "cum_ltv":  395278,
+        "cum_dc":  38163,
+        "cum_flgp":  11290
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  23.17,
+        "cum_ltv":  412745,
+        "cum_dc":  39897,
+        "cum_flgp":  12240
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  167200,
+        "cum_dc":  11497,
+        "cum_flgp":  5240
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  88.72,
+        "cum_ltv":  324111,
+        "cum_dc":  22742,
+        "cum_flgp":  10686
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  85.91,
+        "cum_ltv":  470992,
+        "cum_dc":  33574,
+        "cum_flgp":  16204
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  84.32,
+        "cum_ltv":  614553,
+        "cum_dc":  44421,
+        "cum_flgp":  22048
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  83.2,
+        "cum_ltv":  756189,
+        "cum_dc":  55421,
+        "cum_flgp":  28293
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  82.45,
+        "cum_ltv":  894796,
+        "cum_dc":  66404,
+        "cum_flgp":  34382
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  81.24,
+        "cum_ltv":  1030050,
+        "cum_dc":  77141,
+        "cum_flgp":  40345
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  80.97,
+        "cum_ltv":  1163089,
+        "cum_dc":  87880,
+        "cum_flgp":  46019
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  79.27,
+        "cum_ltv":  1292949,
+        "cum_dc":  98396,
+        "cum_flgp":  51392
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  78.57,
+        "cum_ltv":  1419468,
+        "cum_dc":  108677,
+        "cum_flgp":  56266
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  76.68,
+        "cum_ltv":  1539856,
+        "cum_dc":  118437,
+        "cum_flgp":  61479
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  74.76,
+        "cum_ltv":  1654881,
+        "cum_dc":  127940,
+        "cum_flgp":  67255
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  73.18,
+        "cum_ltv":  1762605,
+        "cum_dc":  137037,
+        "cum_flgp":  73100
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  46950,
+        "cum_dc":  3449,
+        "cum_flgp":  864
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  60.33,
+        "cum_ltv":  86908,
+        "cum_dc":  5824,
+        "cum_flgp":  2401
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  56.51,
+        "cum_ltv":  125138,
+        "cum_dc":  8185,
+        "cum_flgp":  4042
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  55.52,
+        "cum_ltv":  163386,
+        "cum_dc":  10585,
+        "cum_flgp":  5864
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  54.54,
+        "cum_ltv":  201403,
+        "cum_dc":  13182,
+        "cum_flgp":  7756
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  53.98,
+        "cum_ltv":  239501,
+        "cum_dc":  15897,
+        "cum_flgp":  9598
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  53.45,
+        "cum_ltv":  277558,
+        "cum_dc":  18661,
+        "cum_flgp":  11372
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  53.6,
+        "cum_ltv":  317247,
+        "cum_dc":  21648,
+        "cum_flgp":  13121
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  52.85,
+        "cum_ltv":  356521,
+        "cum_dc":  24650,
+        "cum_flgp":  14745
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  52.26,
+        "cum_ltv":  395528,
+        "cum_dc":  27631,
+        "cum_flgp":  16290
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  51.14,
+        "cum_ltv":  433759,
+        "cum_dc":  30526,
+        "cum_flgp":  18122
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  49.09,
+        "cum_ltv":  469357,
+        "cum_dc":  33322,
+        "cum_flgp":  20026
+    },
+    {
+        "brand":  "미분당",
+        "category":  "ASIAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  47.79,
+        "cum_ltv":  503071,
+        "cum_dc":  36035,
+        "cum_flgp":  21939
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  45285,
+        "cum_dc":  9430,
+        "cum_flgp":  -4366
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  36.2,
+        "cum_ltv":  75979,
+        "cum_dc":  11489,
+        "cum_flgp":  -3354
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  29.8,
+        "cum_ltv":  101643,
+        "cum_dc":  12977,
+        "cum_flgp":  -2065
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  27.71,
+        "cum_ltv":  126052,
+        "cum_dc":  14428,
+        "cum_flgp":  -728
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  26.28,
+        "cum_ltv":  148800,
+        "cum_dc":  15830,
+        "cum_flgp":  565
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  25.39,
+        "cum_ltv":  170438,
+        "cum_dc":  17217,
+        "cum_flgp":  1821
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  25.96,
+        "cum_ltv":  192340,
+        "cum_dc":  18705,
+        "cum_flgp":  3030
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  26.25,
+        "cum_ltv":  214641,
+        "cum_dc":  20284,
+        "cum_flgp":  4206
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  25.22,
+        "cum_ltv":  235491,
+        "cum_dc":  21815,
+        "cum_flgp":  5246
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  23.96,
+        "cum_ltv":  255731,
+        "cum_dc":  23307,
+        "cum_flgp":  6196
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  24.97,
+        "cum_ltv":  275991,
+        "cum_dc":  24763,
+        "cum_flgp":  7205
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  24.33,
+        "cum_ltv":  295163,
+        "cum_dc":  26276,
+        "cum_flgp":  8243
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  24.01,
+        "cum_ltv":  315244,
+        "cum_dc":  27774,
+        "cum_flgp":  9467
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  147424,
+        "cum_dc":  7406,
+        "cum_flgp":  5905
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  85.19,
+        "cum_ltv":  285094,
+        "cum_dc":  14819,
+        "cum_flgp":  12345
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  82.79,
+        "cum_ltv":  415622,
+        "cum_dc":  22139,
+        "cum_flgp":  18926
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  80.95,
+        "cum_ltv":  542348,
+        "cum_dc":  29477,
+        "cum_flgp":  25861
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  79.69,
+        "cum_ltv":  667895,
+        "cum_dc":  36965,
+        "cum_flgp":  33263
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  78.82,
+        "cum_ltv":  790369,
+        "cum_dc":  44456,
+        "cum_flgp":  40503
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  77.76,
+        "cum_ltv":  911114,
+        "cum_dc":  51940,
+        "cum_flgp":  47737
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  77.52,
+        "cum_ltv":  1032029,
+        "cum_dc":  59537,
+        "cum_flgp":  54937
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  76.12,
+        "cum_ltv":  1148986,
+        "cum_dc":  66919,
+        "cum_flgp":  61701
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  75.62,
+        "cum_ltv":  1266674,
+        "cum_dc":  74338,
+        "cum_flgp":  68214
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  74.74,
+        "cum_ltv":  1380652,
+        "cum_dc":  81562,
+        "cum_flgp":  74900
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  73.61,
+        "cum_ltv":  1489532,
+        "cum_dc":  88660,
+        "cum_flgp":  81823
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  72.13,
+        "cum_ltv":  1593333,
+        "cum_dc":  95618,
+        "cum_flgp":  88736
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  42907,
+        "cum_dc":  2886,
+        "cum_flgp":  780
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  56.18,
+        "cum_ltv":  78794,
+        "cum_dc":  4790,
+        "cum_flgp":  2337
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  52.78,
+        "cum_ltv":  113655,
+        "cum_dc":  6703,
+        "cum_flgp":  4043
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  51.67,
+        "cum_ltv":  148880,
+        "cum_dc":  8755,
+        "cum_flgp":  5898
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  50.19,
+        "cum_ltv":  183901,
+        "cum_dc":  10923,
+        "cum_flgp":  7873
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  49.75,
+        "cum_ltv":  219112,
+        "cum_dc":  13197,
+        "cum_flgp":  9857
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  49.52,
+        "cum_ltv":  254250,
+        "cum_dc":  15541,
+        "cum_flgp":  11801
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  50.05,
+        "cum_ltv":  290603,
+        "cum_dc":  18067,
+        "cum_flgp":  13739
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  49.74,
+        "cum_ltv":  327435,
+        "cum_dc":  20648,
+        "cum_flgp":  15662
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  49.36,
+        "cum_ltv":  364795,
+        "cum_dc":  23260,
+        "cum_flgp":  17557
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  48.55,
+        "cum_ltv":  401260,
+        "cum_dc":  25817,
+        "cum_flgp":  19525
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  47.17,
+        "cum_ltv":  435930,
+        "cum_dc":  28330,
+        "cum_flgp":  21562
+    },
+    {
+        "brand":  "본죽\u0026비빔밥",
+        "category":  "BAEKBAN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  45.62,
+        "cum_ltv":  469562,
+        "cum_dc":  30824,
+        "cum_flgp":  23638
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  22553,
+        "cum_dc":  7710,
+        "cum_flgp":  -3370
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  40.08,
+        "cum_ltv":  42414,
+        "cum_dc":  11348,
+        "cum_flgp":  -3337
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  32.96,
+        "cum_ltv":  58676,
+        "cum_dc":  13901,
+        "cum_flgp":  -2780
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  31.05,
+        "cum_ltv":  74221,
+        "cum_dc":  16069,
+        "cum_flgp":  -2141
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  29.58,
+        "cum_ltv":  88675,
+        "cum_dc":  18201,
+        "cum_flgp":  -1532
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  27.89,
+        "cum_ltv":  102206,
+        "cum_dc":  20181,
+        "cum_flgp":  -921
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  26.37,
+        "cum_ltv":  115555,
+        "cum_dc":  21952,
+        "cum_flgp":  -274
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  23.17,
+        "cum_ltv":  127261,
+        "cum_dc":  23389,
+        "cum_flgp":  273
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  27.7,
+        "cum_ltv":  147833,
+        "cum_dc":  25741,
+        "cum_flgp":  1080
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  27.2,
+        "cum_ltv":  167046,
+        "cum_dc":  27913,
+        "cum_flgp":  1811
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  25.03,
+        "cum_ltv":  184509,
+        "cum_dc":  29816,
+        "cum_flgp":  2600
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  24.14,
+        "cum_ltv":  199816,
+        "cum_dc":  31652,
+        "cum_flgp":  3267
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  25.68,
+        "cum_ltv":  218104,
+        "cum_dc":  33622,
+        "cum_flgp":  4255
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  113789,
+        "cum_dc":  12790,
+        "cum_flgp":  3202
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  89.46,
+        "cum_ltv":  228350,
+        "cum_dc":  24918,
+        "cum_flgp":  6999
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  85.68,
+        "cum_ltv":  334054,
+        "cum_dc":  35908,
+        "cum_flgp":  10792
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  83.85,
+        "cum_ltv":  440413,
+        "cum_dc":  46840,
+        "cum_flgp":  14859
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  82.09,
+        "cum_ltv":  546704,
+        "cum_dc":  57718,
+        "cum_flgp":  19222
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  81.14,
+        "cum_ltv":  656805,
+        "cum_dc":  69013,
+        "cum_flgp":  23668
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  81.01,
+        "cum_ltv":  771053,
+        "cum_dc":  80670,
+        "cum_flgp":  28163
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  81.07,
+        "cum_ltv":  891953,
+        "cum_dc":  92692,
+        "cum_flgp":  32816
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  81.49,
+        "cum_ltv":  1016374,
+        "cum_dc":  104936,
+        "cum_flgp":  37633
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  80.84,
+        "cum_ltv":  1140122,
+        "cum_dc":  117260,
+        "cum_flgp":  42383
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  79.22,
+        "cum_ltv":  1256318,
+        "cum_dc":  128874,
+        "cum_flgp":  47412
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  75.57,
+        "cum_ltv":  1358700,
+        "cum_dc":  138773,
+        "cum_flgp":  52541
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  74.52,
+        "cum_ltv":  1462804,
+        "cum_dc":  148063,
+        "cum_flgp":  58461
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  22103,
+        "cum_dc":  3571,
+        "cum_flgp":  -198
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  63.61,
+        "cum_ltv":  52440,
+        "cum_dc":  7345,
+        "cum_flgp":  713
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  61.55,
+        "cum_ltv":  83451,
+        "cum_dc":  11119,
+        "cum_flgp":  1775
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  60.03,
+        "cum_ltv":  114527,
+        "cum_dc":  14698,
+        "cum_flgp":  2987
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  59.16,
+        "cum_ltv":  145595,
+        "cum_dc":  18460,
+        "cum_flgp":  4228
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  56.53,
+        "cum_ltv":  175615,
+        "cum_dc":  22205,
+        "cum_flgp":  5514
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  55.8,
+        "cum_ltv":  205927,
+        "cum_dc":  25799,
+        "cum_flgp":  6795
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  50.64,
+        "cum_ltv":  232303,
+        "cum_dc":  28776,
+        "cum_flgp":  7892
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  59.64,
+        "cum_ltv":  271823,
+        "cum_dc":  33182,
+        "cum_flgp":  9386
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  59.04,
+        "cum_ltv":  311069,
+        "cum_dc":  37480,
+        "cum_flgp":  10863
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  57.95,
+        "cum_ltv":  349022,
+        "cum_dc":  41672,
+        "cum_flgp":  12462
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  54.54,
+        "cum_ltv":  382571,
+        "cum_dc":  45588,
+        "cum_flgp":  13976
+    },
+    {
+        "brand":  "빽다방",
+        "category":  "CAFE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  54.53,
+        "cum_ltv":  418467,
+        "cum_dc":  49547,
+        "cum_flgp":  15809
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  43299,
+        "cum_dc":  11379,
+        "cum_flgp":  -4103
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  39.43,
+        "cum_ltv":  79661,
+        "cum_dc":  16030,
+        "cum_flgp":  -3685
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  29.81,
+        "cum_ltv":  107030,
+        "cum_dc":  18750,
+        "cum_flgp":  -2667
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  26.12,
+        "cum_ltv":  131461,
+        "cum_dc":  21076,
+        "cum_flgp":  -1615
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  26.17,
+        "cum_ltv":  154655,
+        "cum_dc":  23317,
+        "cum_flgp":  -554
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  24.59,
+        "cum_ltv":  177363,
+        "cum_dc":  25506,
+        "cum_flgp":  493
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  23.45,
+        "cum_ltv":  201517,
+        "cum_dc":  27552,
+        "cum_flgp":  1592
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  26.11,
+        "cum_ltv":  232049,
+        "cum_dc":  29882,
+        "cum_flgp":  3271
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  24.77,
+        "cum_ltv":  262658,
+        "cum_dc":  32187,
+        "cum_flgp":  5205
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  24.34,
+        "cum_ltv":  289663,
+        "cum_dc":  34318,
+        "cum_flgp":  6346
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  22.57,
+        "cum_ltv":  313366,
+        "cum_dc":  36314,
+        "cum_flgp":  7274
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  21.02,
+        "cum_ltv":  336429,
+        "cum_dc":  38301,
+        "cum_flgp":  8347
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  21.56,
+        "cum_ltv":  359729,
+        "cum_dc":  40512,
+        "cum_flgp":  9429
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  182375,
+        "cum_dc":  17215,
+        "cum_flgp":  3505
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  89.25,
+        "cum_ltv":  355276,
+        "cum_dc":  32872,
+        "cum_flgp":  8326
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  86.12,
+        "cum_ltv":  516417,
+        "cum_dc":  47628,
+        "cum_flgp":  13709
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  83.53,
+        "cum_ltv":  667034,
+        "cum_dc":  61474,
+        "cum_flgp":  19434
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  80.67,
+        "cum_ltv":  807361,
+        "cum_dc":  73771,
+        "cum_flgp":  25672
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  78.71,
+        "cum_ltv":  953976,
+        "cum_dc":  85813,
+        "cum_flgp":  32538
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  79.19,
+        "cum_ltv":  1118112,
+        "cum_dc":  98723,
+        "cum_flgp":  40459
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  80.07,
+        "cum_ltv":  1292381,
+        "cum_dc":  112361,
+        "cum_flgp":  48585
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  79.21,
+        "cum_ltv":  1466949,
+        "cum_dc":  126109,
+        "cum_flgp":  56382
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  78.34,
+        "cum_ltv":  1638814,
+        "cum_dc":  139625,
+        "cum_flgp":  63359
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  76.56,
+        "cum_ltv":  1804641,
+        "cum_dc":  152715,
+        "cum_flgp":  70662
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  74.94,
+        "cum_ltv":  1957857,
+        "cum_dc":  164908,
+        "cum_flgp":  78625
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  72.3,
+        "cum_ltv":  2097927,
+        "cum_dc":  176241,
+        "cum_flgp":  86593
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  41601,
+        "cum_dc":  4882,
+        "cum_flgp":  -18
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  60.65,
+        "cum_ltv":  81429,
+        "cum_dc":  8548,
+        "cum_flgp":  1104
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  55.49,
+        "cum_ltv":  118387,
+        "cum_dc":  11682,
+        "cum_flgp":  2390
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  52.84,
+        "cum_ltv":  154403,
+        "cum_dc":  14797,
+        "cum_flgp":  3835
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  51.5,
+        "cum_ltv":  190263,
+        "cum_dc":  17915,
+        "cum_flgp":  5483
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  48.69,
+        "cum_ltv":  224206,
+        "cum_dc":  20667,
+        "cum_flgp":  7161
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  45.98,
+        "cum_ltv":  257316,
+        "cum_dc":  23143,
+        "cum_flgp":  8828
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  48.65,
+        "cum_ltv":  297965,
+        "cum_dc":  26076,
+        "cum_flgp":  10784
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  48.64,
+        "cum_ltv":  340482,
+        "cum_dc":  29199,
+        "cum_flgp":  12748
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  48.32,
+        "cum_ltv":  384018,
+        "cum_dc":  32377,
+        "cum_flgp":  14556
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  47.07,
+        "cum_ltv":  425775,
+        "cum_dc":  35462,
+        "cum_flgp":  16415
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  44.67,
+        "cum_ltv":  464428,
+        "cum_dc":  38377,
+        "cum_flgp":  18383
+    },
+    {
+        "brand":  "스타벅스",
+        "category":  "CAFE_CHAIN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  42.3,
+        "cum_ltv":  501408,
+        "cum_dc":  41335,
+        "cum_flgp":  20400
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  65035,
+        "cum_dc":  8365,
+        "cum_flgp":  -1215
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  38.78,
+        "cum_ltv":  119070,
+        "cum_dc":  11499,
+        "cum_flgp":  721
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  33.75,
+        "cum_ltv":  168646,
+        "cum_dc":  14257,
+        "cum_flgp":  3037
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  32.7,
+        "cum_ltv":  216664,
+        "cum_dc":  16935,
+        "cum_flgp":  5445
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  31.83,
+        "cum_ltv":  263928,
+        "cum_dc":  19587,
+        "cum_flgp":  8382
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  31.3,
+        "cum_ltv":  314229,
+        "cum_dc":  22756,
+        "cum_flgp":  11448
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  32.36,
+        "cum_ltv":  363043,
+        "cum_dc":  25921,
+        "cum_flgp":  14328
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  31.95,
+        "cum_ltv":  413431,
+        "cum_dc":  29071,
+        "cum_flgp":  17308
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  33.66,
+        "cum_ltv":  460907,
+        "cum_dc":  32298,
+        "cum_flgp":  20171
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  34.39,
+        "cum_ltv":  510907,
+        "cum_dc":  35508,
+        "cum_flgp":  23522
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  36.26,
+        "cum_ltv":  564443,
+        "cum_dc":  39609,
+        "cum_flgp":  26527
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  34.81,
+        "cum_ltv":  617496,
+        "cum_dc":  43676,
+        "cum_flgp":  29809
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  35.55,
+        "cum_ltv":  666912,
+        "cum_dc":  46600,
+        "cum_flgp":  33392
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  200017,
+        "cum_dc":  10119,
+        "cum_flgp":  8362
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  91.07,
+        "cum_ltv":  387568,
+        "cum_dc":  20389,
+        "cum_flgp":  17011
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  88.87,
+        "cum_ltv":  564956,
+        "cum_dc":  30472,
+        "cum_flgp":  25852
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  87.85,
+        "cum_ltv":  739290,
+        "cum_dc":  40696,
+        "cum_flgp":  35238
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  86.7,
+        "cum_ltv":  909327,
+        "cum_dc":  50951,
+        "cum_flgp":  45336
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  85.73,
+        "cum_ltv":  1077365,
+        "cum_dc":  61396,
+        "cum_flgp":  55264
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  84.58,
+        "cum_ltv":  1239810,
+        "cum_dc":  71571,
+        "cum_flgp":  65037
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  83.48,
+        "cum_ltv":  1398736,
+        "cum_dc":  81613,
+        "cum_flgp":  74459
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  82.87,
+        "cum_ltv":  1556051,
+        "cum_dc":  91659,
+        "cum_flgp":  83700
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  81.8,
+        "cum_ltv":  1709302,
+        "cum_dc":  101433,
+        "cum_flgp":  92412
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  81.05,
+        "cum_ltv":  1859816,
+        "cum_dc":  111082,
+        "cum_flgp":  101383
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  79.84,
+        "cum_ltv":  2000629,
+        "cum_dc":  120271,
+        "cum_flgp":  110413
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  78.46,
+        "cum_ltv":  2133460,
+        "cum_dc":  129143,
+        "cum_flgp":  119354
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  52320,
+        "cum_dc":  2697,
+        "cum_flgp":  1883
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  63.44,
+        "cum_ltv":  98610,
+        "cum_dc":  4901,
+        "cum_flgp":  4087
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  60.55,
+        "cum_ltv":  144564,
+        "cum_dc":  7208,
+        "cum_flgp":  6517
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  59.73,
+        "cum_ltv":  191434,
+        "cum_dc":  9705,
+        "cum_flgp":  9173
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  58.95,
+        "cum_ltv":  239075,
+        "cum_dc":  12400,
+        "cum_flgp":  12097
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  58.63,
+        "cum_ltv":  286946,
+        "cum_dc":  15194,
+        "cum_flgp":  14995
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  58.32,
+        "cum_ltv":  335278,
+        "cum_dc":  18126,
+        "cum_flgp":  17876
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  58.14,
+        "cum_ltv":  383917,
+        "cum_dc":  21214,
+        "cum_flgp":  20696
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  57.83,
+        "cum_ltv":  433061,
+        "cum_dc":  24376,
+        "cum_flgp":  23528
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  56.83,
+        "cum_ltv":  482640,
+        "cum_dc":  27623,
+        "cum_flgp":  26308
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  56.78,
+        "cum_ltv":  531527,
+        "cum_dc":  30891,
+        "cum_flgp":  29183
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  54.54,
+        "cum_ltv":  577654,
+        "cum_dc":  34107,
+        "cum_flgp":  32058
+    },
+    {
+        "brand":  "역전할머니맥주",
+        "category":  "NIGHTSNACK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  52.96,
+        "cum_ltv":  621453,
+        "cum_dc":  37217,
+        "cum_flgp":  34921
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  69574,
+        "cum_dc":  11918,
+        "cum_flgp":  -2966
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  49.67,
+        "cum_ltv":  132773,
+        "cum_dc":  16627,
+        "cum_flgp":  -173
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  40.39,
+        "cum_ltv":  182388,
+        "cum_dc":  20010,
+        "cum_flgp":  2555
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  37.99,
+        "cum_ltv":  227542,
+        "cum_dc":  23183,
+        "cum_flgp":  5057
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  36.75,
+        "cum_ltv":  271302,
+        "cum_dc":  26506,
+        "cum_flgp":  7447
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  35.12,
+        "cum_ltv":  316206,
+        "cum_dc":  30034,
+        "cum_flgp":  9745
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  36.22,
+        "cum_ltv":  363046,
+        "cum_dc":  33637,
+        "cum_flgp":  12248
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  35.16,
+        "cum_ltv":  406966,
+        "cum_dc":  36913,
+        "cum_flgp":  14860
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  33.89,
+        "cum_ltv":  445588,
+        "cum_dc":  39938,
+        "cum_flgp":  17020
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  32.68,
+        "cum_ltv":  480671,
+        "cum_dc":  42467,
+        "cum_flgp":  18997
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  29.92,
+        "cum_ltv":  510269,
+        "cum_dc":  45008,
+        "cum_flgp":  20489
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  30.43,
+        "cum_ltv":  539209,
+        "cum_dc":  47868,
+        "cum_flgp":  21937
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  26.32,
+        "cum_ltv":  570482,
+        "cum_dc":  50654,
+        "cum_flgp":  23804
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  221937,
+        "cum_dc":  15582,
+        "cum_flgp":  9408
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  91.45,
+        "cum_ltv":  428670,
+        "cum_dc":  30944,
+        "cum_flgp":  18911
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  88.37,
+        "cum_ltv":  617052,
+        "cum_dc":  45333,
+        "cum_flgp":  28089
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  87,
+        "cum_ltv":  803040,
+        "cum_dc":  59909,
+        "cum_flgp":  37303
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  85.65,
+        "cum_ltv":  985577,
+        "cum_dc":  74495,
+        "cum_flgp":  46510
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  84.89,
+        "cum_ltv":  1165232,
+        "cum_dc":  89117,
+        "cum_flgp":  55584
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  83.86,
+        "cum_ltv":  1341565,
+        "cum_dc":  103664,
+        "cum_flgp":  64523
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  82.56,
+        "cum_ltv":  1511614,
+        "cum_dc":  117873,
+        "cum_flgp":  72933
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  81.2,
+        "cum_ltv":  1675211,
+        "cum_dc":  131741,
+        "cum_flgp":  80798
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  79.61,
+        "cum_ltv":  1831349,
+        "cum_dc":  145127,
+        "cum_flgp":  88247
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  78.87,
+        "cum_ltv":  1982742,
+        "cum_dc":  158353,
+        "cum_flgp":  96008
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  77.58,
+        "cum_ltv":  2128502,
+        "cum_dc":  171602,
+        "cum_flgp":  103837
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  75.86,
+        "cum_ltv":  2260506,
+        "cum_dc":  183894,
+        "cum_flgp":  111153
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  57050,
+        "cum_dc":  4263,
+        "cum_flgp":  1791
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  63.91,
+        "cum_ltv":  107957,
+        "cum_dc":  7480,
+        "cum_flgp":  4289
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  57.96,
+        "cum_ltv":  154307,
+        "cum_dc":  10452,
+        "cum_flgp":  6827
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  56.97,
+        "cum_ltv":  202007,
+        "cum_dc":  13655,
+        "cum_flgp":  9532
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  55.66,
+        "cum_ltv":  248903,
+        "cum_dc":  16971,
+        "cum_flgp":  12159
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  55.28,
+        "cum_ltv":  295584,
+        "cum_dc":  20341,
+        "cum_flgp":  14777
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  55.17,
+        "cum_ltv":  344156,
+        "cum_dc":  23925,
+        "cum_flgp":  17449
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  55.1,
+        "cum_ltv":  393735,
+        "cum_dc":  27770,
+        "cum_flgp":  20067
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  54.29,
+        "cum_ltv":  442648,
+        "cum_dc":  31653,
+        "cum_flgp":  22598
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  53.72,
+        "cum_ltv":  491782,
+        "cum_dc":  35530,
+        "cum_flgp":  25194
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  53.04,
+        "cum_ltv":  539074,
+        "cum_dc":  39278,
+        "cum_flgp":  27822
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  51.88,
+        "cum_ltv":  586769,
+        "cum_dc":  43236,
+        "cum_flgp":  30551
+    },
+    {
+        "brand":  "육식사관학교",
+        "category":  "MEAT",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  51.22,
+        "cum_ltv":  633527,
+        "cum_dc":  47371,
+        "cum_flgp":  33208
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  51290,
+        "cum_dc":  11910,
+        "cum_flgp":  -4656
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  47.84,
+        "cum_ltv":  92310,
+        "cum_dc":  15439,
+        "cum_flgp":  -3691
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  39.43,
+        "cum_ltv":  124759,
+        "cum_dc":  17897,
+        "cum_flgp":  -2365
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  37.02,
+        "cum_ltv":  156693,
+        "cum_dc":  20410,
+        "cum_flgp":  -1031
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  36.43,
+        "cum_ltv":  186848,
+        "cum_dc":  22796,
+        "cum_flgp":  360
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  35.99,
+        "cum_ltv":  217256,
+        "cum_dc":  25305,
+        "cum_flgp":  1777
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  36.77,
+        "cum_ltv":  248492,
+        "cum_dc":  28195,
+        "cum_flgp":  3059
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  37.46,
+        "cum_ltv":  281817,
+        "cum_dc":  31269,
+        "cum_flgp":  4316
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  37.24,
+        "cum_ltv":  314005,
+        "cum_dc":  34075,
+        "cum_flgp":  5557
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  35.72,
+        "cum_ltv":  342532,
+        "cum_dc":  36585,
+        "cum_flgp":  6594
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  34.88,
+        "cum_ltv":  370983,
+        "cum_dc":  39125,
+        "cum_flgp":  7716
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  34.76,
+        "cum_ltv":  401341,
+        "cum_dc":  41991,
+        "cum_flgp":  8993
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  35.87,
+        "cum_ltv":  432147,
+        "cum_dc":  45083,
+        "cum_flgp":  10436
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  154036,
+        "cum_dc":  11152,
+        "cum_flgp":  5088
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  89.24,
+        "cum_ltv":  297854,
+        "cum_dc":  22221,
+        "cum_flgp":  10227
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  86.36,
+        "cum_ltv":  432061,
+        "cum_dc":  32872,
+        "cum_flgp":  15380
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  84.94,
+        "cum_ltv":  564203,
+        "cum_dc":  43659,
+        "cum_flgp":  20749
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  83.66,
+        "cum_ltv":  693790,
+        "cum_dc":  54465,
+        "cum_flgp":  26365
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  82.75,
+        "cum_ltv":  820570,
+        "cum_dc":  65237,
+        "cum_flgp":  31766
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  81.74,
+        "cum_ltv":  945315,
+        "cum_dc":  75918,
+        "cum_flgp":  37018
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  80.59,
+        "cum_ltv":  1067578,
+        "cum_dc":  86489,
+        "cum_flgp":  42015
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  79.41,
+        "cum_ltv":  1186805,
+        "cum_dc":  96869,
+        "cum_flgp":  46716
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  78.52,
+        "cum_ltv":  1303130,
+        "cum_dc":  107049,
+        "cum_flgp":  51056
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  77.12,
+        "cum_ltv":  1413566,
+        "cum_dc":  116801,
+        "cum_flgp":  55619
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  75.68,
+        "cum_ltv":  1517441,
+        "cum_dc":  126150,
+        "cum_flgp":  60524
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  73.9,
+        "cum_ltv":  1617029,
+        "cum_dc":  135284,
+        "cum_flgp":  65656
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  47747,
+        "cum_dc":  3539,
+        "cum_flgp":  1169
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  64.45,
+        "cum_ltv":  90765,
+        "cum_dc":  6395,
+        "cum_flgp":  2796
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  60.03,
+        "cum_ltv":  131472,
+        "cum_dc":  9160,
+        "cum_flgp":  4543
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  59.46,
+        "cum_ltv":  172594,
+        "cum_dc":  12130,
+        "cum_flgp":  6401
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  58.18,
+        "cum_ltv":  214183,
+        "cum_dc":  15245,
+        "cum_flgp":  8383
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  57.51,
+        "cum_ltv":  255480,
+        "cum_dc":  18457,
+        "cum_flgp":  10327
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  57.67,
+        "cum_ltv":  297853,
+        "cum_dc":  21858,
+        "cum_flgp":  12236
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  57.95,
+        "cum_ltv":  341091,
+        "cum_dc":  25420,
+        "cum_flgp":  14072
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  57.25,
+        "cum_ltv":  384603,
+        "cum_dc":  29046,
+        "cum_flgp":  15822
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  56.58,
+        "cum_ltv":  427785,
+        "cum_dc":  32702,
+        "cum_flgp":  17490
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  54.9,
+        "cum_ltv":  469189,
+        "cum_dc":  36229,
+        "cum_flgp":  19272
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  53.41,
+        "cum_ltv":  508660,
+        "cum_dc":  39666,
+        "cum_flgp":  21203
+    },
+    {
+        "brand":  "육회바른연어",
+        "category":  "JAPANESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  52.19,
+        "cum_ltv":  547092,
+        "cum_dc":  43119,
+        "cum_flgp":  23190
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  42632,
+        "cum_dc":  11013,
+        "cum_flgp":  -4716
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  49.67,
+        "cum_ltv":  76574,
+        "cum_dc":  13466,
+        "cum_flgp":  -3541
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  44.89,
+        "cum_ltv":  106419,
+        "cum_dc":  15167,
+        "cum_flgp":  -1860
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  43.99,
+        "cum_ltv":  136031,
+        "cum_dc":  16943,
+        "cum_flgp":  -116
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  43.53,
+        "cum_ltv":  165328,
+        "cum_dc":  18789,
+        "cum_flgp":  1692
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  43.37,
+        "cum_ltv":  195509,
+        "cum_dc":  20777,
+        "cum_flgp":  3509
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  43.63,
+        "cum_ltv":  226273,
+        "cum_dc":  22929,
+        "cum_flgp":  5317
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  44.06,
+        "cum_ltv":  256860,
+        "cum_dc":  25134,
+        "cum_flgp":  7090
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  43.36,
+        "cum_ltv":  287033,
+        "cum_dc":  27297,
+        "cum_flgp":  8832
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  42.72,
+        "cum_ltv":  316028,
+        "cum_dc":  29363,
+        "cum_flgp":  10445
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  41.65,
+        "cum_ltv":  343776,
+        "cum_dc":  31339,
+        "cum_flgp":  12075
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  41.86,
+        "cum_ltv":  372731,
+        "cum_dc":  33368,
+        "cum_flgp":  13932
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  39.97,
+        "cum_ltv":  400054,
+        "cum_dc":  35477,
+        "cum_flgp":  15652
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  133908,
+        "cum_dc":  7171,
+        "cum_flgp":  5874
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  89.8,
+        "cum_ltv":  262988,
+        "cum_dc":  14651,
+        "cum_flgp":  12001
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  87.38,
+        "cum_ltv":  385221,
+        "cum_dc":  22012,
+        "cum_flgp":  18231
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  86.16,
+        "cum_ltv":  505797,
+        "cum_dc":  29500,
+        "cum_flgp":  24831
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  85.35,
+        "cum_ltv":  625562,
+        "cum_dc":  37153,
+        "cum_flgp":  31915
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  84.54,
+        "cum_ltv":  743716,
+        "cum_dc":  44953,
+        "cum_flgp":  38842
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  83.59,
+        "cum_ltv":  859571,
+        "cum_dc":  52691,
+        "cum_flgp":  45676
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  82.7,
+        "cum_ltv":  973976,
+        "cum_dc":  60430,
+        "cum_flgp":  52341
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  81.79,
+        "cum_ltv":  1086176,
+        "cum_dc":  68125,
+        "cum_flgp":  58751
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  80.89,
+        "cum_ltv":  1196867,
+        "cum_dc":  75756,
+        "cum_flgp":  64858
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  79.94,
+        "cum_ltv":  1304374,
+        "cum_dc":  83248,
+        "cum_flgp":  71111
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  78.86,
+        "cum_ltv":  1406877,
+        "cum_dc":  90583,
+        "cum_flgp":  77528
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  77.07,
+        "cum_ltv":  1503632,
+        "cum_dc":  97753,
+        "cum_flgp":  83832
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  42941,
+        "cum_dc":  2696,
+        "cum_flgp":  1481
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  66.05,
+        "cum_ltv":  83241,
+        "cum_dc":  4887,
+        "cum_flgp":  3392
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  63.24,
+        "cum_ltv":  122909,
+        "cum_dc":  7086,
+        "cum_flgp":  5511
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  62.45,
+        "cum_ltv":  163227,
+        "cum_dc":  9448,
+        "cum_flgp":  7815
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  61.85,
+        "cum_ltv":  204120,
+        "cum_dc":  11973,
+        "cum_flgp":  10292
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  61.43,
+        "cum_ltv":  245179,
+        "cum_dc":  14606,
+        "cum_flgp":  12772
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  61.5,
+        "cum_ltv":  286865,
+        "cum_dc":  17377,
+        "cum_flgp":  15231
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  61.65,
+        "cum_ltv":  329789,
+        "cum_dc":  20324,
+        "cum_flgp":  17706
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  61.36,
+        "cum_ltv":  373258,
+        "cum_dc":  23363,
+        "cum_flgp":  20146
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  60.67,
+        "cum_ltv":  416712,
+        "cum_dc":  26436,
+        "cum_flgp":  22526
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  59.33,
+        "cum_ltv":  458743,
+        "cum_dc":  29437,
+        "cum_flgp":  24971
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  58.12,
+        "cum_ltv":  499609,
+        "cum_dc":  32463,
+        "cum_flgp":  27485
+    },
+    {
+        "brand":  "탕화쿵푸마라탕",
+        "category":  "CHINESE",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  56.7,
+        "cum_ltv":  539488,
+        "cum_dc":  35537,
+        "cum_flgp":  30013
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  58046,
+        "cum_dc":  10010,
+        "cum_flgp":  -2619
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  47.84,
+        "cum_ltv":  107091,
+        "cum_dc":  13645,
+        "cum_flgp":  -1307
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  40.07,
+        "cum_ltv":  149237,
+        "cum_dc":  16535,
+        "cum_flgp":  456
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  39.1,
+        "cum_ltv":  192309,
+        "cum_dc":  19427,
+        "cum_flgp":  2516
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  37.39,
+        "cum_ltv":  230997,
+        "cum_dc":  22066,
+        "cum_flgp":  4549
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  35.91,
+        "cum_ltv":  265643,
+        "cum_dc":  24735,
+        "cum_flgp":  6154
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  35,
+        "cum_ltv":  301808,
+        "cum_dc":  27545,
+        "cum_flgp":  7921
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  35.71,
+        "cum_ltv":  339519,
+        "cum_dc":  30288,
+        "cum_flgp":  9749
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  35.28,
+        "cum_ltv":  377626,
+        "cum_dc":  33139,
+        "cum_flgp":  11542
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  34.41,
+        "cum_ltv":  412191,
+        "cum_dc":  35846,
+        "cum_flgp":  12914
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  33.79,
+        "cum_ltv":  449759,
+        "cum_dc":  38876,
+        "cum_flgp":  14836
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  34.45,
+        "cum_ltv":  482263,
+        "cum_dc":  41654,
+        "cum_flgp":  16547
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  32.02,
+        "cum_ltv":  514488,
+        "cum_dc":  44632,
+        "cum_flgp":  18330
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  186270,
+        "cum_dc":  12522,
+        "cum_flgp":  5713
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  91.77,
+        "cum_ltv":  364504,
+        "cum_dc":  25212,
+        "cum_flgp":  11890
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  89.59,
+        "cum_ltv":  533496,
+        "cum_dc":  37697,
+        "cum_flgp":  18303
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  88.1,
+        "cum_ltv":  698693,
+        "cum_dc":  50285,
+        "cum_flgp":  25220
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  86.9,
+        "cum_ltv":  861331,
+        "cum_dc":  63044,
+        "cum_flgp":  32717
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  85.88,
+        "cum_ltv":  1020525,
+        "cum_dc":  75909,
+        "cum_flgp":  39998
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  84.64,
+        "cum_ltv":  1175319,
+        "cum_dc":  88555,
+        "cum_flgp":  47078
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  83.66,
+        "cum_ltv":  1327325,
+        "cum_dc":  100982,
+        "cum_flgp":  53928
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  82.77,
+        "cum_ltv":  1476114,
+        "cum_dc":  113251,
+        "cum_flgp":  60319
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  81.76,
+        "cum_ltv":  1621790,
+        "cum_dc":  125220,
+        "cum_flgp":  66225
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  80.48,
+        "cum_ltv":  1761042,
+        "cum_dc":  136736,
+        "cum_flgp":  72483
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  79.02,
+        "cum_ltv":  1891400,
+        "cum_dc":  147824,
+        "cum_flgp":  79242
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  77.44,
+        "cum_ltv":  2016679,
+        "cum_dc":  158764,
+        "cum_flgp":  86232
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  47390,
+        "cum_dc":  3305,
+        "cum_flgp":  981
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  66.18,
+        "cum_ltv":  93703,
+        "cum_dc":  6090,
+        "cum_flgp":  2666
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  62.89,
+        "cum_ltv":  139125,
+        "cum_dc":  8968,
+        "cum_flgp":  4516
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  62.04,
+        "cum_ltv":  186062,
+        "cum_dc":  12172,
+        "cum_flgp":  6617
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  61.23,
+        "cum_ltv":  233504,
+        "cum_dc":  15626,
+        "cum_flgp":  8927
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  60.11,
+        "cum_ltv":  280701,
+        "cum_dc":  19244,
+        "cum_flgp":  11199
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  59.79,
+        "cum_ltv":  329569,
+        "cum_dc":  23066,
+        "cum_flgp":  13479
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  59.94,
+        "cum_ltv":  378804,
+        "cum_dc":  26976,
+        "cum_flgp":  15704
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  59.49,
+        "cum_ltv":  428988,
+        "cum_dc":  31106,
+        "cum_flgp":  17755
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  58.7,
+        "cum_ltv":  481133,
+        "cum_dc":  35408,
+        "cum_flgp":  19719
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  57.55,
+        "cum_ltv":  531310,
+        "cum_dc":  39655,
+        "cum_flgp":  21765
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  55.7,
+        "cum_ltv":  580567,
+        "cum_dc":  44063,
+        "cum_flgp":  24067
+    },
+    {
+        "brand":  "파스타입니다",
+        "category":  "WESTERN",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  55.25,
+        "cum_ltv":  631193,
+        "cum_dc":  48725,
+        "cum_flgp":  26568
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  46303,
+        "cum_dc":  10823,
+        "cum_flgp":  -4679
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  39.89,
+        "cum_ltv":  76890,
+        "cum_dc":  13198,
+        "cum_flgp":  -3797
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  33.07,
+        "cum_ltv":  102539,
+        "cum_dc":  14872,
+        "cum_flgp":  -2590
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  32.15,
+        "cum_ltv":  127624,
+        "cum_dc":  16559,
+        "cum_flgp":  -1329
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  30.66,
+        "cum_ltv":  151645,
+        "cum_dc":  18192,
+        "cum_flgp":  7
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  30.07,
+        "cum_ltv":  176081,
+        "cum_dc":  19899,
+        "cum_flgp":  1340
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  30.43,
+        "cum_ltv":  201269,
+        "cum_dc":  21766,
+        "cum_flgp":  2672
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  31.47,
+        "cum_ltv":  226601,
+        "cum_dc":  23712,
+        "cum_flgp":  3928
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  30.05,
+        "cum_ltv":  251110,
+        "cum_dc":  25571,
+        "cum_flgp":  5133
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  29.79,
+        "cum_ltv":  274738,
+        "cum_dc":  27330,
+        "cum_flgp":  6279
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  28.57,
+        "cum_ltv":  296957,
+        "cum_dc":  29020,
+        "cum_flgp":  7477
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  28.85,
+        "cum_ltv":  319632,
+        "cum_dc":  30789,
+        "cum_flgp":  8752
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  28.48,
+        "cum_ltv":  342758,
+        "cum_dc":  32717,
+        "cum_flgp":  10071
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  152699,
+        "cum_dc":  8351,
+        "cum_flgp":  5511
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  87.16,
+        "cum_ltv":  297471,
+        "cum_dc":  16899,
+        "cum_flgp":  12224
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  84.16,
+        "cum_ltv":  432511,
+        "cum_dc":  25177,
+        "cum_flgp":  18989
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  82.71,
+        "cum_ltv":  565731,
+        "cum_dc":  33534,
+        "cum_flgp":  26173
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  81.18,
+        "cum_ltv":  698549,
+        "cum_dc":  41877,
+        "cum_flgp":  33977
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  80.48,
+        "cum_ltv":  831768,
+        "cum_dc":  50379,
+        "cum_flgp":  41868
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  79.83,
+        "cum_ltv":  968898,
+        "cum_dc":  58930,
+        "cum_flgp":  49693
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  79.03,
+        "cum_ltv":  1106679,
+        "cum_dc":  67472,
+        "cum_flgp":  57498
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  77.96,
+        "cum_ltv":  1242243,
+        "cum_dc":  75883,
+        "cum_flgp":  65355
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  76.95,
+        "cum_ltv":  1384077,
+        "cum_dc":  84689,
+        "cum_flgp":  73696
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  75.88,
+        "cum_ltv":  1530654,
+        "cum_dc":  93513,
+        "cum_flgp":  83202
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  74.43,
+        "cum_ltv":  1652969,
+        "cum_dc":  101544,
+        "cum_flgp":  91292
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  72.87,
+        "cum_ltv":  1751025,
+        "cum_dc":  108972,
+        "cum_flgp":  97338
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  45639,
+        "cum_dc":  3061,
+        "cum_flgp":  1315
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  60.01,
+        "cum_ltv":  83695,
+        "cum_dc":  5310,
+        "cum_flgp":  2956
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  56.11,
+        "cum_ltv":  120225,
+        "cum_dc":  7508,
+        "cum_flgp":  4752
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  55.15,
+        "cum_ltv":  157262,
+        "cum_dc":  9846,
+        "cum_flgp":  6700
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  54.16,
+        "cum_ltv":  194451,
+        "cum_dc":  12268,
+        "cum_flgp":  8794
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  53.31,
+        "cum_ltv":  231399,
+        "cum_dc":  14738,
+        "cum_flgp":  10855
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  54.14,
+        "cum_ltv":  269716,
+        "cum_dc":  17391,
+        "cum_flgp":  12915
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  54.36,
+        "cum_ltv":  309316,
+        "cum_dc":  20220,
+        "cum_flgp":  14943
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  54.28,
+        "cum_ltv":  349401,
+        "cum_dc":  23123,
+        "cum_flgp":  16961
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  53.35,
+        "cum_ltv":  389116,
+        "cum_dc":  26031,
+        "cum_flgp":  18900
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  52.25,
+        "cum_ltv":  428003,
+        "cum_dc":  28883,
+        "cum_flgp":  20954
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  51.15,
+        "cum_ltv":  465617,
+        "cum_dc":  31733,
+        "cum_flgp":  23112
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  49.75,
+        "cum_ltv":  501972,
+        "cum_dc":  34613,
+        "cum_flgp":  25265
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  55615,
+        "cum_dc":  8679,
+        "cum_flgp":  -1992
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  45.55,
+        "cum_ltv":  107014,
+        "cum_dc":  11841,
+        "cum_flgp":  -7
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  37.27,
+        "cum_ltv":  148349,
+        "cum_dc":  14120,
+        "cum_flgp":  2244
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  34.82,
+        "cum_ltv":  187819,
+        "cum_dc":  16412,
+        "cum_flgp":  4531
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  32.65,
+        "cum_ltv":  223806,
+        "cum_dc":  18517,
+        "cum_flgp":  6779
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  33.35,
+        "cum_ltv":  259939,
+        "cum_dc":  20763,
+        "cum_flgp":  8929
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  33.49,
+        "cum_ltv":  297526,
+        "cum_dc":  23262,
+        "cum_flgp":  11116
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  33.17,
+        "cum_ltv":  335342,
+        "cum_dc":  25805,
+        "cum_flgp":  13251
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  33.03,
+        "cum_ltv":  369753,
+        "cum_dc":  28154,
+        "cum_flgp":  15173
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  31.7,
+        "cum_ltv":  403422,
+        "cum_dc":  30422,
+        "cum_flgp":  16967
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  31.25,
+        "cum_ltv":  437404,
+        "cum_dc":  32760,
+        "cum_flgp":  18879
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  31.36,
+        "cum_ltv":  470318,
+        "cum_dc":  35023,
+        "cum_flgp":  20906
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  27.03,
+        "cum_ltv":  498965,
+        "cum_dc":  36960,
+        "cum_flgp":  22838
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  188243,
+        "cum_dc":  9422,
+        "cum_flgp":  7845
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  89.94,
+        "cum_ltv":  366999,
+        "cum_dc":  19110,
+        "cum_flgp":  15941
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  87.31,
+        "cum_ltv":  534556,
+        "cum_dc":  28594,
+        "cum_flgp":  24218
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  85.73,
+        "cum_ltv":  698123,
+        "cum_dc":  38233,
+        "cum_flgp":  32990
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  84.54,
+        "cum_ltv":  859558,
+        "cum_dc":  48127,
+        "cum_flgp":  42336
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  83.37,
+        "cum_ltv":  1015920,
+        "cum_dc":  58014,
+        "cum_flgp":  51362
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  82.26,
+        "cum_ltv":  1168831,
+        "cum_dc":  67807,
+        "cum_flgp":  60270
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  81.32,
+        "cum_ltv":  1318164,
+        "cum_dc":  77502,
+        "cum_flgp":  68864
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  79.86,
+        "cum_ltv":  1461379,
+        "cum_dc":  86853,
+        "cum_flgp":  76961
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  78.76,
+        "cum_ltv":  1602409,
+        "cum_dc":  96089,
+        "cum_flgp":  84767
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  77.49,
+        "cum_ltv":  1736025,
+        "cum_dc":  104950,
+        "cum_flgp":  92581
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  76.14,
+        "cum_ltv":  1863214,
+        "cum_dc":  113559,
+        "cum_flgp":  100578
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  74.48,
+        "cum_ltv":  1982430,
+        "cum_dc":  121819,
+        "cum_flgp":  108405
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  46559,
+        "cum_dc":  2280,
+        "cum_flgp":  1781
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  63.08,
+        "cum_ltv":  91443,
+        "cum_dc":  4382,
+        "cum_flgp":  3878
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  58.88,
+        "cum_ltv":  134128,
+        "cum_dc":  6490,
+        "cum_flgp":  6109
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  57.8,
+        "cum_ltv":  177091,
+        "cum_dc":  8823,
+        "cum_flgp":  8482
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  56.37,
+        "cum_ltv":  219757,
+        "cum_dc":  11301,
+        "cum_flgp":  11016
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  55.85,
+        "cum_ltv":  262717,
+        "cum_dc":  13954,
+        "cum_flgp":  13499
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  55.55,
+        "cum_ltv":  305766,
+        "cum_dc":  16751,
+        "cum_flgp":  15948
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  55.37,
+        "cum_ltv":  349466,
+        "cum_dc":  19726,
+        "cum_flgp":  18317
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  54.43,
+        "cum_ltv":  392560,
+        "cum_dc":  22709,
+        "cum_flgp":  20636
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  53.68,
+        "cum_ltv":  435281,
+        "cum_dc":  25736,
+        "cum_flgp":  22874
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  52.4,
+        "cum_ltv":  476718,
+        "cum_dc":  28770,
+        "cum_flgp":  25159
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  50.93,
+        "cum_ltv":  516030,
+        "cum_dc":  31760,
+        "cum_flgp":  27467
+    },
+    {
+        "brand":  "한솥도시락",
+        "category":  "DOSIRAK",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  48.5,
+        "cum_ltv":  552876,
+        "cum_dc":  34577,
+        "cum_flgp":  29738
+    }
+]
+;
+const SEG_LIST  = ['0.첫주문','1.활성','2.이탈복귀'];
+const SEG_KEY   = { '0.첫주문':'first', '1.활성':'active', '2.이탈복귀':'ret' };
+const CAT_KO    = { CHICKEN:'치킨',FASTFOOD:'패스트푸드',SNACK:'분식',ZZIM_TANG:'찜/탕',CHINESE:'중식',BAEKBAN:'백반/죽',DOSIRAK:'도시락',JOKBAL:'족발/보쌈',PIZZA:'피자',CAFE:'카페',JAPANESE:'일식',WESTERN:'양식',NIGHTSNACK:'야식',MEAT:'육류',ASIAN:'아시안',CAFE_CHAIN:'카페(스타벅스)' };
+const ALL_BRANDS = [...new Set(RAW.map(function(d){return d.brand;}))].sort();
+const PALETTE    = ['#e63946','#457b9d','#2a9d8f','#e9c46a','#f4a261','#264653','#a8dadc','#06d6a0','#ef476f','#ffd166','#118ab2','#073b4c','#9b5de5','#f15bb5','#00bbf9'];
+const BC = {};
+ALL_BRANDS.forEach(function(b,i){ BC[b] = b==='스타벅스'?'#00704a': b==='빽다방'?'#f4a261' : PALETTE[i%15]; });
+
+function getD(brand,seg,md){ return RAW.find(function(d){return d.brand===brand&&d.seg===seg&&d.month_diff===md;})||{}; }
+function getSeries(brand,seg){ return RAW.filter(function(d){return d.brand===brand&&d.seg===seg;}).sort(function(a,b){return a.month_diff-b.month_diff;}); }
+function getData(seg,md){ return RAW.filter(function(d){return d.seg===seg&&d.month_diff===md;}).sort(function(a,b){return b.retention-a.retention;}); }
+function pct(n){ return (n||0).toFixed(1)+'%'; }
+function won(n){ return (n||0).toLocaleString('ko-KR')+'원'; }
+function manwon(n){ return ((n||0)/10000).toFixed(0)+'만원'; }
+
+const charts = {};
+function mc(id,cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),cfg); }
+const MONTHS = [0,1,2,3,4,5,6,7,8,9,10,11,12];
+
+/* ===================== PAGE 1: vs 전체 ===================== */
+function buildP1(){
+  var el = document.getElementById('p1');
+  var html = '<div class="seg-tabs">';
+  SEG_LIST.forEach(function(s,i){
+    html += '<div class="seg-tab'+(i===0?' active':'')+'" onclick="switchSeg(\'p1\',\''+SEG_KEY[s]+'\',this)">'+s+'</div>';
+  });
+  html += '</div>';
+  SEG_LIST.forEach(function(seg,i){
+    var key = SEG_KEY[seg];
+    html += '<div id="p1-'+key+'" class="seg-panel'+(i===0?' active':'')+'">';
+    html += buildP1Seg(seg);
+    html += '</div>';
+  });
+  el.innerHTML = html;
+  SEG_LIST.forEach(function(seg){ renderP1Charts(seg); });
+}
+
+function buildP1Seg(seg){
+  var rows = getData(seg,12);
+  var maxRet = Math.max.apply(null, rows.map(function(d){return d.retention;}));
+  var maxLTV = Math.max.apply(null, rows.map(function(d){return d.cum_ltv;}));
+  var maxFLGP= Math.max.apply(null, rows.map(function(d){return d.cum_flgp;}));
+  var sbD = getD('스타벅스',seg,12);
+  var retRank  = rows.findIndex(function(d){return d.brand==='스타벅스';})+1;
+  var ltvRank  = [...rows].sort(function(a,b){return b.cum_ltv-a.cum_ltv;}).findIndex(function(d){return d.brand==='스타벅스';})+1;
+  var flgpRank = [...rows].sort(function(a,b){return b.cum_flgp-a.cum_flgp;}).findIndex(function(d){return d.brand==='스타벅스';})+1;
+  var total = rows.length;
+
+  // 요약 배지
+  var html = '<div class="section-title">스타벅스 M+12 순위 요약</div>'
+    +'<div class="scorecard">'
+    +'<div class="sc sb"><div class="sc-label">잔존율</div><div class="sc-val">'+pct(sbD.retention)+'</div><div class="sc-sub sc-diff '+(retRank<=5?'up':retRank>=total-2?'dn':'neu')+'">전체 '+retRank+'위/'+total+'</div></div>'
+    +'<div class="sc sb"><div class="sc-label">누적 LTV</div><div class="sc-val">'+manwon(sbD.cum_ltv)+'</div><div class="sc-sub sc-diff '+(ltvRank<=5?'up':ltvRank>=total-2?'dn':'neu')+'">전체 '+ltvRank+'위/'+total+'</div></div>'
+    +'<div class="sc sb"><div class="sc-label">누적 할인비용</div><div class="sc-val">'+manwon(sbD.cum_dc)+'</div><div class="sc-sub" style="color:#888">M+12 누적</div></div>'
+    +'<div class="sc sb"><div class="sc-label">누적 FLGP</div><div class="sc-val" style="color:'+(sbD.cum_flgp>=0?'#059669':'#dc2626')+'">'+manwon(sbD.cum_flgp)+'</div><div class="sc-sub sc-diff '+(flgpRank<=5?'up':flgpRank>=total-2?'dn':'neu')+'">전체 '+flgpRank+'위/'+total+'</div></div>'
+    +'</div>';
+
+  // 랭킹 바
+  var retS  = [...rows].sort(function(a,b){return b.retention-a.retention;});
+  var ltvS  = [...rows].sort(function(a,b){return b.cum_ltv-a.cum_ltv;});
+  html += '<div class="section-title">M+12 전체 브랜드 순위</div><div class="rank-grid">';
+  // 잔존율 랭킹
+  html += '<div class="rank-box"><h3>잔존율 순위</h3>';
+  retS.forEach(function(d,i){
+    var isSB=d.brand==='스타벅스', isBB=d.brand==='빽다방';
+    var w=(d.retention/maxRet*100).toFixed(1);
+    html += '<div class="rank-row'+(isSB?' hl':isBB?' hl2':'')+'">'
+      +'<div class="rank-num">'+(i+1)+'</div>'
+      +'<div class="rank-name">'+d.brand+'</div>'
+      +'<div class="rank-bar-wrap"><div class="rank-bar" style="width:'+w+'%"></div></div>'
+      +'<div class="rank-val">'+pct(d.retention)+'</div></div>';
+  });
+  html += '</div>';
+  // LTV 랭킹
+  html += '<div class="rank-box"><h3>누적 LTV 순위</h3>';
+  ltvS.forEach(function(d,i){
+    var isSB=d.brand==='스타벅스', isBB=d.brand==='빽다방';
+    var w=(d.cum_ltv/maxLTV*100).toFixed(1);
+    html += '<div class="rank-row'+(isSB?' hl':isBB?' hl2':'')+'">'
+      +'<div class="rank-num">'+(i+1)+'</div>'
+      +'<div class="rank-name">'+d.brand+'</div>'
+      +'<div class="rank-bar-wrap"><div class="rank-bar" style="width:'+w+'%"></div></div>'
+      +'<div class="rank-val">'+manwon(d.cum_ltv)+'</div></div>';
+  });
+  html += '</div></div>';
+
+  // 차트 플레이스홀더
+  var key=SEG_KEY[seg];
+  html += '<div class="section-title">추이 차트</div>'
+    +'<div class="chart-row">'
+    +'<div class="chart-box"><h3>잔존율 추이 (전 브랜드)</h3><canvas id="p1-ret-'+key+'"></canvas></div>'
+    +'<div class="chart-box"><h3>누적 LTV 추이 (전 브랜드)</h3><canvas id="p1-ltv-'+key+'"></canvas></div>'
+    +'</div>';
+
+  // 테이블
+  var byLTV=[...rows].sort(function(a,b){return b.cum_ltv-a.cum_ltv;});
+  html += '<div class="section-title">상세 테이블 (LTV 기준)</div><table>'
+    +'<thead><tr><th>브랜드</th><th>카테고리</th><th>잔존율(M+12)</th><th>누적 LTV</th><th>누적 할인비용</th><th>누적 FLGP</th></tr></thead><tbody>';
+  byLTV.forEach(function(d){
+    var isSB=d.brand==='스타벅스', isBB=d.brand==='빽다방';
+    html += '<tr class="'+(isSB?'sb-row':isBB?'bb-row':'')+'">'
+      +'<td class="td-brand">'+(isSB?'🟢 ':isBB?'🟠 ':'')+d.brand+'</td>'
+      +'<td style="font-size:11px;color:#777">'+(CAT_KO[d.category]||d.category)+'</td>'
+      +'<td>'+pct(d.retention)+'</td><td>'+won(d.cum_ltv)+'</td><td>'+won(d.cum_dc)+'</td>'
+      +'<td class="'+(d.cum_flgp>=0?'pos':'neg')+'">'+won(d.cum_flgp)+'</td></tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderP1Charts(seg){
+  var key=SEG_KEY[seg];
+  mc('p1-ret-'+key,{ type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
+    datasets:ALL_BRANDS.map(function(b){
+      var s=getSeries(b,seg); var isSB=b==='스타벅스', isBB=b==='빽다방';
+      return { label:b, data:MONTHS.map(function(m){var r=s.find(function(x){return x.month_diff===m;}); return r?r.retention:null;}),
+        borderColor:BC[b], borderWidth:isSB?3:isBB?2.5:1.2, pointRadius:isSB?4:isBB?3:1.5,
+        borderDash:(isSB||isBB)?[]:[4,3], tension:0.3, spanGaps:false, fill:false }; }) },
+    options:{ responsive:true, plugins:{ legend:{position:'right',labels:{font:{size:10},boxWidth:10,padding:5}},
+      tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toFixed(1)+'%';}}} },
+      scales:{ y:{title:{display:true,text:'%'},min:0}, x:{grid:{display:false}} } } });
+
+  mc('p1-ltv-'+key,{ type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
+    datasets:ALL_BRANDS.map(function(b){
+      var s=getSeries(b,seg); var isSB=b==='스타벅스', isBB=b==='빽다방';
+      return { label:b, data:MONTHS.map(function(m){var r=s.find(function(x){return x.month_diff===m;}); return r?r.cum_ltv:null;}),
+        borderColor:BC[b], borderWidth:isSB?3:isBB?2.5:1.2, pointRadius:isSB?4:isBB?3:1.5,
+        borderDash:(isSB||isBB)?[]:[4,3], tension:0.3, spanGaps:false, fill:false }; }) },
+    options:{ responsive:true, plugins:{ legend:{position:'right',labels:{font:{size:10},boxWidth:10,padding:5}},
+      tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toLocaleString('ko-KR')+'원';}}} },
+      scales:{ y:{title:{display:true,text:'원'},ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}}, x:{grid:{display:false}} } } });
+}
+
+/* ===================== PAGE 2: vs 빽다방 1:1 ===================== */
+function buildP2(){
+  var el = document.getElementById('p2');
+  var html = '<div class="seg-tabs">';
+  SEG_LIST.forEach(function(s,i){
+    html += '<div class="seg-tab'+(i===0?' active':'')+'" onclick="switchSeg(\'p2\',\''+SEG_KEY[s]+'\',this)">'+s+'</div>';
+  });
+  html += '</div>';
+  SEG_LIST.forEach(function(seg,i){
+    var key=SEG_KEY[seg];
+    html += '<div id="p2-'+key+'" class="seg-panel'+(i===0?' active':'')+'">';
+    html += buildP2Seg(seg);
+    html += '</div>';
+  });
+  el.innerHTML = html;
+  SEG_LIST.forEach(function(seg){ renderP2Charts(seg); });
+}
+
+function buildP2Seg(seg){
+  var sb=getD('스타벅스',seg,12);
+  var bb=getD('빽다방',seg,12);
+  if(!sb.brand||!bb.brand) return '<p style="color:#aaa;padding:20px">데이터 없음</p>';
+
+  function diffStr(sbV,bbV,isRetention){
+    var diff = sbV-bbV;
+    var str = isRetention ? (diff>0?'+':'')+diff.toFixed(1)+'%p' : (diff>0?'+':'')+Math.round(diff).toLocaleString('ko-KR')+'원';
+    var cls = diff>0?'up':'dn';
+    return '<span class="'+cls+'">스타벅스 '+(diff>0?'▲':'▼')+' '+str.replace('-','')+'</span>';
+  }
+
+  var metrics = [
+    {label:'잔존율(M+12)',   sbV:sb.retention, bbV:bb.retention, fmt:pct,    isRet:true },
+    {label:'누적 LTV',      sbV:sb.cum_ltv,   bbV:bb.cum_ltv,   fmt:won,    isRet:false},
+    {label:'누적 할인비용',  sbV:sb.cum_dc,    bbV:bb.cum_dc,    fmt:won,    isRet:false},
+    {label:'누적 FLGP',     sbV:sb.cum_flgp,  bbV:bb.cum_flgp,  fmt:won,    isRet:false},
+  ];
+
+  // 스코어카드
+  var html = '<div class="section-title">M+12 핵심 지표 비교</div><div class="scorecard">';
+  metrics.forEach(function(m){
+    html += '<div class="sc" style="border:none;background:#f8f9fc">'
+      +'<div class="sc-label">'+m.label+'</div>'
+      +'<div style="display:flex;justify-content:space-around;align-items:flex-end;margin:8px 0">'
+      +'<div style="text-align:center"><div style="font-size:10px;font-weight:700;color:#00704a;margin-bottom:3px">🟢 스타벅스</div><div style="font-size:18px;font-weight:800;color:#00704a">'+m.fmt(m.sbV)+'</div></div>'
+      +'<div style="font-size:18px;color:#ccc;padding-bottom:2px">vs</div>'
+      +'<div style="text-align:center"><div style="font-size:10px;font-weight:700;color:#f4a261;margin-bottom:3px">🟠 빽다방</div><div style="font-size:18px;font-weight:800;color:#f4a261">'+m.fmt(m.bbV)+'</div></div>'
+      +'</div>'
+      +'<div style="text-align:center;font-size:11px;padding-top:6px;border-top:1px solid #eee">'+diffStr(m.sbV,m.bbV,m.isRet)+'</div>'
+      +'</div>';
+  });
+  html += '</div>';
+
+  // 차트 플레이스홀더
+  var key=SEG_KEY[seg];
+  html += '<div class="section-title">추이 비교</div>'
+    +'<div class="chart-row">'
+    +'<div class="chart-box"><h3>잔존율 추이</h3><canvas id="p2-ret-'+key+'"></canvas></div>'
+    +'<div class="chart-box"><h3>누적 LTV 추이</h3><canvas id="p2-ltv-'+key+'"></canvas></div>'
+    +'</div>'
+    +'<div class="chart-row">'
+    +'<div class="chart-box"><h3>누적 할인비용 추이</h3><canvas id="p2-dc-'+key+'"></canvas></div>'
+    +'<div class="chart-box"><h3>누적 FLGP 추이</h3><canvas id="p2-flgp-'+key+'"></canvas></div>'
+    +'</div>';
+
+  // 월별 상세 테이블
+  var sbS=getSeries('스타벅스',seg), bbS=getSeries('빽다방',seg);
+  html += '<div class="section-title">월별 상세 비교 (M+0~M+12)</div><table>'
+    +'<thead><tr><th>Month</th>'
+    +'<th style="color:#a8d8c0">🟢 잔존율</th><th style="color:#f4c090">🟠 잔존율</th>'
+    +'<th style="color:#a8d8c0">🟢 누적LTV</th><th style="color:#f4c090">🟠 누적LTV</th>'
+    +'<th style="color:#a8d8c0">🟢 누적FLGP</th><th style="color:#f4c090">🟠 누적FLGP</th>'
+    +'</tr></thead><tbody>';
+  for(var m=0;m<=12;m++){
+    var sr=sbS.find(function(x){return x.month_diff===m;})||{};
+    var br=bbS.find(function(x){return x.month_diff===m;})||{};
+    if(!sr.retention&&!br.retention) continue;
+    var retDiff = sr.retention&&br.retention ? (sr.retention-br.retention) : null;
+    var ltvDiff = sr.cum_ltv&&br.cum_ltv ? (sr.cum_ltv-br.cum_ltv) : null;
+    html += '<tr><td style="font-weight:700">M+'+m+'</td>'
+      +'<td>'+(sr.retention?pct(sr.retention):'-')+'</td>'
+      +'<td>'+(br.retention?pct(br.retention):'-')+'</td>'
+      +'<td>'+(sr.cum_ltv?won(sr.cum_ltv):'-')+'</td>'
+      +'<td>'+(br.cum_ltv?won(br.cum_ltv):'-')+'</td>'
+      +'<td class="'+(sr.cum_flgp>=0?'pos':'neg')+'">'+(sr.cum_flgp!==undefined?won(sr.cum_flgp):'-')+'</td>'
+      +'<td class="'+(br.cum_flgp>=0?'pos':'neg')+'">'+(br.cum_flgp!==undefined?won(br.cum_flgp):'-')+'</td>'
+      +'</tr>';
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderP2Charts(seg){
+  var key=SEG_KEY[seg];
+  var sbS=getSeries('스타벅스',seg), bbS=getSeries('빽다방',seg);
+  var ds = function(b,s,field){ return { label:b, data:MONTHS.map(function(m){var r=s.find(function(x){return x.month_diff===m;}); return r?r[field]:null;}),
+    borderColor:BC[b], backgroundColor:BC[b]+'22', borderWidth:2.5, pointRadius:4, tension:0.3, spanGaps:false, fill:true }; };
+
+  mc('p2-ret-'+key, { type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
+    datasets:[ ds('스타벅스',sbS,'retention'), ds('빽다방',bbS,'retention') ] },
+    options:{ responsive:true, plugins:{legend:{position:'top'}}, scales:{ y:{title:{display:true,text:'%'},min:0}, x:{grid:{display:false}} } } });
+
+  mc('p2-ltv-'+key, { type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
+    datasets:[ ds('스타벅스',sbS,'cum_ltv'), ds('빽다방',bbS,'cum_ltv') ] },
+    options:{ responsive:true, plugins:{legend:{position:'top'},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toLocaleString('ko-KR')+'원';}}}},
+      scales:{ y:{ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}, title:{display:true,text:'원'}}, x:{grid:{display:false}} } } });
+
+  mc('p2-dc-'+key, { type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
+    datasets:[ ds('스타벅스',sbS,'cum_dc'), ds('빽다방',bbS,'cum_dc') ] },
+    options:{ responsive:true, plugins:{legend:{position:'top'},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toLocaleString('ko-KR')+'원';}}}},
+      scales:{ y:{ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}, title:{display:true,text:'원'}}, x:{grid:{display:false}} } } });
+
+  mc('p2-flgp-'+key, { type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
+    datasets:[ ds('스타벅스',sbS,'cum_flgp'), ds('빽다방',bbS,'cum_flgp') ] },
+    options:{ responsive:true, plugins:{legend:{position:'top'},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toLocaleString('ko-KR')+'원';}}}},
+      scales:{ y:{ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}, title:{display:true,text:'원'}}, x:{grid:{display:false}} } } });
+}
+
+/* ===================== 탭 전환 ===================== */
+function switchPage(id){
+  document.querySelectorAll('.page-tab').forEach(function(t,i){
+    t.classList.toggle('active',['p1','p2'][i]===id);
+  });
+  document.querySelectorAll('.page-panel').forEach(function(p){ p.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+function switchSeg(pageId, segKey, el){
+  var container = document.getElementById(pageId);
+  container.querySelectorAll('.seg-tab').forEach(function(t){ t.classList.remove('active'); });
+  el.classList.add('active');
+  container.querySelectorAll('.seg-panel').forEach(function(p){ p.classList.remove('active'); });
+  document.getElementById(pageId+'-'+segKey).classList.add('active');
+}
+
+buildP1();
+buildP2();
+</script></body></html>
