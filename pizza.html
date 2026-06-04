@@ -1,0 +1,4097 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>피자 브랜드 LTV / 잔존율 분석</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Apple SD Gothic Neo',sans-serif; background:#f0f2f5; color:#1a1a2e; }
+  header { background:linear-gradient(135deg,#1a1a2e,#9a2617); color:white; padding:28px 40px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:22px; font-weight:700; }
+  header p  { font-size:13px; color:#e0b0a0; margin-top:6px; }
+  header a  { color:white; font-size:12px; opacity:.7; text-decoration:none; border:1px solid rgba(255,255,255,.4); padding:6px 14px; border-radius:20px; }
+  header a:hover { opacity:1; }
+  .note { background:#fffbe6; border-left:4px solid #f59e0b; padding:10px 16px; margin:16px 40px 0; font-size:12px; color:#555; border-radius:4px; }
+  .seg-tabs { display:flex; gap:4px; padding:20px 40px 0; }
+  .seg-tab  { padding:10px 24px; border-radius:8px 8px 0 0; cursor:pointer; font-size:14px; font-weight:600; background:#dde2ec; color:#555; }
+  .seg-tab.active { background:white; color:#9a2617; box-shadow:0 -2px 8px rgba(0,0,0,.08); }
+  .panel { display:none; background:white; margin:0 40px; padding:24px; border-radius:0 8px 8px 8px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+  .panel.active { display:block; }
+  .section-title { font-size:15px; font-weight:700; color:#9a2617; margin:24px 0 12px; padding-left:12px; border-left:4px solid #9a2617; }
+  .summary { margin:20px 40px 0; background:white; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,.08); overflow:hidden; }
+  .summary-head { background:linear-gradient(135deg,#9a2617,#5a160d); color:white; padding:18px 24px; display:flex; align-items:center; gap:10px; }
+  .summary-body { padding:20px 24px; }
+  .verdict { background:#fef6f4; border:1px solid #e8c0b5; border-radius:8px; padding:14px 18px; margin-bottom:18px; font-size:14px; line-height:1.7; }
+  .seg3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .segcard { border-radius:8px; border:1px solid #e2e8f0; overflow:hidden; }
+  .segcard h4 { background:#1a1a2e; color:white; padding:8px 14px; font-size:12px; font-weight:700; }
+  .segcard .body { padding:12px 14px; font-size:12px; line-height:1.8; }
+  .segrow { display:flex; justify-content:space-between; border-bottom:1px solid #f0f0f0; padding-bottom:6px; margin-bottom:8px; }
+  .segrow:last-of-type { border-bottom:none; margin-bottom:0; }
+  .card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(195px,1fr)); gap:10px; margin-bottom:8px; }
+  .card { background:#f8f9fc; border-radius:8px; padding:14px 16px; border:1px solid #e2e8f0; }
+  .card .rank { font-size:11px; color:#888; margin-bottom:4px; }
+  .card .brand-name { font-size:15px; font-weight:700; }
+  .cat-badge { display:inline-block; font-size:10px; padding:2px 6px; border-radius:10px; background:#fde8e3; color:#9a2617; margin:4px 0 8px; font-weight:600; }
+  .card .metric { display:flex; justify-content:space-between; font-size:12px; margin:3px 0; }
+  .card .metric .label { color:#777; }
+  .card .metric .value { font-weight:700; }
+  .card.top1 { background:linear-gradient(135deg,#fff7e6,#fffbf0); border-color:#f59e0b; }
+  .card.top2 { background:linear-gradient(135deg,#f0f0f0,#fafafa); border-color:#aaa; }
+  .card.top3 { background:linear-gradient(135deg,#fff3ec,#fffaf8); border-color:#cd7c4b; }
+  .card.bot  { background:#fef2f2; border-color:#fca5a5; }
+  .chart-row { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+  .chart-box { background:#f8f9fc; border-radius:8px; padding:16px; border:1px solid #e2e8f0; }
+  .chart-box h3 { font-size:13px; color:#555; margin-bottom:12px; text-align:center; }
+  .chart-full { background:#f8f9fc; border-radius:8px; padding:16px; border:1px solid #e2e8f0; margin-bottom:20px; }
+  .chart-full h3 { font-size:13px; color:#555; margin-bottom:12px; text-align:center; }
+  canvas { max-height:340px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:8px; }
+  th { background:#1a1a2e; color:white; padding:10px 12px; text-align:center; font-weight:600; }
+  td { padding:9px 12px; text-align:center; border-bottom:1px solid #eee; }
+  tr:hover td { background:#fdf0ee; }
+  .td-brand { text-align:left; font-weight:600; }
+  .pos { color:#059669; font-weight:700; }
+  .neg { color:#dc2626; font-weight:700; }
+  .up { color:#059669; } .dn { color:#dc2626; } .neu { color:#888; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🍕 피자 브랜드 LTV / 잔존율 분석</h1>
+    <p>피자 카테고리 10개 브랜드 비교 | 코호트 25/03~26/03 | M+12 누적 | 세그: 해당월 첫주문 기준</p>
+  </div>
+  <a href="index.html">← 전체 브랜드 대시보드</a>
+</header>
+<div class="note">⚠️ M+12 지표는 <strong>25/03~25/05 코호트 기준</strong>(M+12 데이터 보유 코호트). 할인비용: 우형부담(쿠폰+HVA+MFO+배민클럽)</div>
+
+<!-- EXEC SUMMARY -->
+<div class="summary">
+  <div class="summary-head"><span style="font-size:18px;">📋</span>
+    <div><div style="font-size:15px;font-weight:800;">Executive Summary — 피자 10개 브랜드 비교</div>
+    <div style="font-size:12px;opacity:.75;margin-top:2px;">잔존율 / LTV / 수익성(FLGP) 종합</div></div>
+  </div>
+  <div class="summary-body">
+    <div class="verdict">
+      <strong style="color:#9a2617;">💡 핵심 판정</strong><br>
+      <strong>청년피자</strong>가 활성·이탈복귀 잔존율 1위로 재구매 충성도가 가장 높고,
+      <strong>파파존스</strong>는 전 세그 LTV·FLGP 최상위권으로 객단가·수익성이 가장 우수.
+      반면 <strong>빽보이피자</strong>는 전 세그 잔존율 최하위 + 할인비용 최고로, 할인 의존도가 높고 수익성이 가장 취약.
+      <strong>피자스쿨·피나치공</strong>은 첫주문 잔존율 1·2위로 신규 고객 유지에 강점.
+    </div>
+    <div class="seg3">
+      <div class="segcard"><h4>0. 첫주문 — 신규 유지</h4><div class="body">
+        <div class="segrow"><span style="color:#888">잔존율 1위</span><strong style="color:#059669">피자스쿨 22.6%</strong></div>
+        <div class="segrow"><span style="color:#888">LTV 1위</span><strong>노모어피자 34.8만</strong></div>
+        <div class="segrow"><span style="color:#888">FLGP 1위</span><strong>피자헛 9,106원</strong></div>
+        <div style="margin-top:10px;padding:7px 10px;background:#fef2f2;border-radius:6px;font-size:11px;color:#b91c1c;line-height:1.5;">⚠️ 빽보이피자 잔존율 11.7%로 최하위 — 첫 구매 후 이탈 심각</div>
+      </div></div>
+      <div class="segcard" style="border:2px solid #9a2617;"><h4 style="background:#9a2617;">1. 활성 — 헤비유저</h4><div class="body">
+        <div class="segrow"><span style="color:#888">잔존율 1위</span><strong style="color:#059669">청년피자 58.7%</strong></div>
+        <div class="segrow"><span style="color:#888">LTV 1위</span><strong>파파존스 162.4만</strong></div>
+        <div class="segrow"><span style="color:#888">FLGP 1위</span><strong>파파존스 96,172원</strong></div>
+        <div style="margin-top:10px;padding:7px 10px;background:#fef6f4;border-radius:6px;font-size:11px;color:#9a2617;line-height:1.5;">✅ 파파존스 객단가·수익성 모두 1위 — 프리미엄 헤비유저층 확보</div>
+      </div></div>
+      <div class="segcard"><h4>2. 이탈복귀 — 재활성</h4><div class="body">
+        <div class="segrow"><span style="color:#888">잔존율 1위</span><strong style="color:#059669">청년피자 38.7%</strong></div>
+        <div class="segrow"><span style="color:#888">LTV 1위</span><strong>반올림피자 48.9만</strong></div>
+        <div class="segrow"><span style="color:#888">FLGP 1위</span><strong>파파존스 26,659원</strong></div>
+        <div style="margin-top:10px;padding:7px 10px;background:#fffbe6;border-radius:6px;font-size:11px;color:#92400e;line-height:1.5;">💡 청년피자 복귀 고객 재잔존율 1위 — 브랜드 충성도 강함</div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<div class="seg-tabs">
+  <div class="seg-tab active" onclick="switchTab('first')">0. 첫주문</div>
+  <div class="seg-tab" onclick="switchTab('active')">1. 활성</div>
+  <div class="seg-tab" onclick="switchTab('ret')">2. 이탈복귀</div>
+</div>
+<div id="panel-first" class="panel active"></div>
+<div id="panel-active" class="panel"></div>
+<div id="panel-ret" class="panel"></div>
+<br>
+<script>
+const RAW =[
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  58110,
+        "cum_dc":  12932,
+        "cum_flgp":  -5663
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  39.55,
+        "cum_ltv":  93945,
+        "cum_dc":  16610,
+        "cum_flgp":  -4999
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  32.42,
+        "cum_ltv":  124025,
+        "cum_dc":  19289,
+        "cum_flgp":  -3897
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  29.95,
+        "cum_ltv":  150992,
+        "cum_dc":  21674,
+        "cum_flgp":  -2862
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  28.44,
+        "cum_ltv":  177336,
+        "cum_dc":  24113,
+        "cum_flgp":  -1832
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  28.56,
+        "cum_ltv":  204614,
+        "cum_dc":  26694,
+        "cum_flgp":  -867
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  27.28,
+        "cum_ltv":  230470,
+        "cum_dc":  29235,
+        "cum_flgp":  -96
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  27.19,
+        "cum_ltv":  254542,
+        "cum_dc":  31674,
+        "cum_flgp":  551
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  25.42,
+        "cum_ltv":  276688,
+        "cum_dc":  33781,
+        "cum_flgp":  1319
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  24.41,
+        "cum_ltv":  297703,
+        "cum_dc":  35752,
+        "cum_flgp":  2269
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  22.07,
+        "cum_ltv":  316169,
+        "cum_dc":  37619,
+        "cum_flgp":  3042
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  20.26,
+        "cum_ltv":  333483,
+        "cum_dc":  39270,
+        "cum_flgp":  3873
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  17.28,
+        "cum_ltv":  348325,
+        "cum_dc":  40749,
+        "cum_flgp":  4531
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  151844,
+        "cum_dc":  13768,
+        "cum_flgp":  4742
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  83.55,
+        "cum_ltv":  279329,
+        "cum_dc":  24428,
+        "cum_flgp":  9397
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  80.32,
+        "cum_ltv":  399373,
+        "cum_dc":  34524,
+        "cum_flgp":  14303
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  78.71,
+        "cum_ltv":  517211,
+        "cum_dc":  44783,
+        "cum_flgp":  19160
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  77.5,
+        "cum_ltv":  633484,
+        "cum_dc":  55010,
+        "cum_flgp":  23933
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  76.36,
+        "cum_ltv":  747640,
+        "cum_dc":  65016,
+        "cum_flgp":  28485
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  71.86,
+        "cum_ltv":  851539,
+        "cum_dc":  73904,
+        "cum_flgp":  32587
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  70.91,
+        "cum_ltv":  955717,
+        "cum_dc":  82580,
+        "cum_flgp":  36805
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  71.67,
+        "cum_ltv":  1062056,
+        "cum_dc":  91495,
+        "cum_flgp":  41611
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  69.62,
+        "cum_ltv":  1163186,
+        "cum_dc":  100054,
+        "cum_flgp":  46739
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  63.58,
+        "cum_ltv":  1251720,
+        "cum_dc":  107589,
+        "cum_flgp":  51429
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  58.32,
+        "cum_ltv":  1328582,
+        "cum_dc":  113973,
+        "cum_flgp":  55611
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  52.33,
+        "cum_ltv":  1393404,
+        "cum_dc":  119430,
+        "cum_flgp":  59014
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  56302,
+        "cum_dc":  6103,
+        "cum_flgp":  841
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  56.2,
+        "cum_ltv":  93796,
+        "cum_dc":  9019,
+        "cum_flgp":  2215
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  52.94,
+        "cum_ltv":  130193,
+        "cum_dc":  11851,
+        "cum_flgp":  3755
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  51.32,
+        "cum_ltv":  166157,
+        "cum_dc":  14760,
+        "cum_flgp":  5310
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  50.67,
+        "cum_ltv":  202523,
+        "cum_dc":  17782,
+        "cum_flgp":  6855
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  51.05,
+        "cum_ltv":  240235,
+        "cum_dc":  20947,
+        "cum_flgp":  8405
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  48.43,
+        "cum_ltv":  276052,
+        "cum_dc":  23992,
+        "cum_flgp":  9768
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  47.46,
+        "cum_ltv":  311759,
+        "cum_dc":  26984,
+        "cum_flgp":  11113
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  47.14,
+        "cum_ltv":  347446,
+        "cum_dc":  29927,
+        "cum_flgp":  12645
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  47.15,
+        "cum_ltv":  383284,
+        "cum_dc":  32965,
+        "cum_flgp":  14346
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  42.99,
+        "cum_ltv":  416355,
+        "cum_dc":  35799,
+        "cum_flgp":  15997
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  37.24,
+        "cum_ltv":  444096,
+        "cum_dc":  38147,
+        "cum_flgp":  17416
+    },
+    {
+        "brand":  "노모어피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  32.9,
+        "cum_ltv":  468040,
+        "cum_dc":  40244,
+        "cum_flgp":  18534
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  57259,
+        "cum_dc":  11309,
+        "cum_flgp":  -4849
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  32.52,
+        "cum_ltv":  82963,
+        "cum_dc":  13065,
+        "cum_flgp":  -3758
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  26.91,
+        "cum_ltv":  104586,
+        "cum_dc":  14394,
+        "cum_flgp":  -2463
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  24.85,
+        "cum_ltv":  125364,
+        "cum_dc":  15691,
+        "cum_flgp":  -1158
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  23.94,
+        "cum_ltv":  146132,
+        "cum_dc":  17015,
+        "cum_flgp":  114
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  22.61,
+        "cum_ltv":  165282,
+        "cum_dc":  18244,
+        "cum_flgp":  1273
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  23.03,
+        "cum_ltv":  184330,
+        "cum_dc":  19562,
+        "cum_flgp":  2324
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  23.26,
+        "cum_ltv":  204404,
+        "cum_dc":  20951,
+        "cum_flgp":  3397
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  23.16,
+        "cum_ltv":  224035,
+        "cum_dc":  22309,
+        "cum_flgp":  4457
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  22.88,
+        "cum_ltv":  242854,
+        "cum_dc":  23707,
+        "cum_flgp":  5518
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  21.1,
+        "cum_ltv":  260603,
+        "cum_dc":  25085,
+        "cum_flgp":  6576
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  20.21,
+        "cum_ltv":  278728,
+        "cum_dc":  26514,
+        "cum_flgp":  7641
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  19.87,
+        "cum_ltv":  294724,
+        "cum_dc":  28002,
+        "cum_flgp":  8332
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  157655,
+        "cum_dc":  7818,
+        "cum_flgp":  8107
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  80.79,
+        "cum_ltv":  282709,
+        "cum_dc":  14891,
+        "cum_flgp":  14997
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  80.55,
+        "cum_ltv":  410284,
+        "cum_dc":  22427,
+        "cum_flgp":  22643
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  78.1,
+        "cum_ltv":  531964,
+        "cum_dc":  29900,
+        "cum_flgp":  30007
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  76.17,
+        "cum_ltv":  648439,
+        "cum_dc":  37091,
+        "cum_flgp":  37040
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  74.61,
+        "cum_ltv":  763646,
+        "cum_dc":  44215,
+        "cum_flgp":  43859
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  74.96,
+        "cum_ltv":  880169,
+        "cum_dc":  51502,
+        "cum_flgp":  50585
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  74.37,
+        "cum_ltv":  996282,
+        "cum_dc":  58815,
+        "cum_flgp":  56992
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  71.66,
+        "cum_ltv":  1104397,
+        "cum_dc":  65626,
+        "cum_flgp":  63216
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  72.3,
+        "cum_ltv":  1217210,
+        "cum_dc":  72995,
+        "cum_flgp":  70367
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  65.47,
+        "cum_ltv":  1313358,
+        "cum_dc":  79500,
+        "cum_flgp":  76514
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  64.11,
+        "cum_ltv":  1407392,
+        "cum_dc":  85993,
+        "cum_flgp":  82569
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  56.87,
+        "cum_ltv":  1484942,
+        "cum_dc":  91559,
+        "cum_flgp":  87309
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  58336,
+        "cum_dc":  3296,
+        "cum_flgp":  2232
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  51.14,
+        "cum_ltv":  91838,
+        "cum_dc":  5168,
+        "cum_flgp":  3943
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  50.22,
+        "cum_ltv":  125952,
+        "cum_dc":  7147,
+        "cum_flgp":  5930
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  49,
+        "cum_ltv":  160112,
+        "cum_dc":  9254,
+        "cum_flgp":  7925
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  47.92,
+        "cum_ltv":  193956,
+        "cum_dc":  11445,
+        "cum_flgp":  9867
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  45.81,
+        "cum_ltv":  227407,
+        "cum_dc":  13605,
+        "cum_flgp":  11769
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  46.54,
+        "cum_ltv":  261648,
+        "cum_dc":  15883,
+        "cum_flgp":  13584
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  47.58,
+        "cum_ltv":  297721,
+        "cum_dc":  18335,
+        "cum_flgp":  15388
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  45.94,
+        "cum_ltv":  332729,
+        "cum_dc":  20739,
+        "cum_flgp":  17215
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  45.9,
+        "cum_ltv":  367389,
+        "cum_dc":  23295,
+        "cum_flgp":  19156
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  44.29,
+        "cum_ltv":  401216,
+        "cum_dc":  25905,
+        "cum_flgp":  21100
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  39.67,
+        "cum_ltv":  431048,
+        "cum_dc":  28271,
+        "cum_flgp":  22778
+    },
+    {
+        "brand":  "도미노피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  34.79,
+        "cum_ltv":  456497,
+        "cum_dc":  30404,
+        "cum_flgp":  24094
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  54855,
+        "cum_dc":  11817,
+        "cum_flgp":  -4370
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  35.62,
+        "cum_ltv":  83831,
+        "cum_dc":  14255,
+        "cum_flgp":  -3298
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  29.53,
+        "cum_ltv":  108592,
+        "cum_dc":  16022,
+        "cum_flgp":  -1927
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  27.59,
+        "cum_ltv":  131227,
+        "cum_dc":  17594,
+        "cum_flgp":  -674
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  26.58,
+        "cum_ltv":  153714,
+        "cum_dc":  19183,
+        "cum_flgp":  562
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  25.57,
+        "cum_ltv":  175801,
+        "cum_dc":  20865,
+        "cum_flgp":  1652
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  25.22,
+        "cum_ltv":  197712,
+        "cum_dc":  22570,
+        "cum_flgp":  2742
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  25.91,
+        "cum_ltv":  220437,
+        "cum_dc":  24421,
+        "cum_flgp":  3758
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  24.77,
+        "cum_ltv":  242397,
+        "cum_dc":  26292,
+        "cum_flgp":  4788
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  22.5,
+        "cum_ltv":  262144,
+        "cum_dc":  27907,
+        "cum_flgp":  5827
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  20.35,
+        "cum_ltv":  279356,
+        "cum_dc":  29245,
+        "cum_flgp":  6786
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  19.45,
+        "cum_ltv":  294861,
+        "cum_dc":  30656,
+        "cum_flgp":  7468
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  18.14,
+        "cum_ltv":  308644,
+        "cum_dc":  31752,
+        "cum_flgp":  8182
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  151854,
+        "cum_dc":  8810,
+        "cum_flgp":  7709
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  83.66,
+        "cum_ltv":  280385,
+        "cum_dc":  16509,
+        "cum_flgp":  14771
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  82.07,
+        "cum_ltv":  406448,
+        "cum_dc":  24197,
+        "cum_flgp":  22301
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  80.39,
+        "cum_ltv":  529661,
+        "cum_dc":  31904,
+        "cum_flgp":  29668
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  79.19,
+        "cum_ltv":  650732,
+        "cum_dc":  39641,
+        "cum_flgp":  36900
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  77.74,
+        "cum_ltv":  768353,
+        "cum_dc":  47217,
+        "cum_flgp":  43764
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  77.83,
+        "cum_ltv":  887519,
+        "cum_dc":  54976,
+        "cum_flgp":  50457
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  76.76,
+        "cum_ltv":  1004093,
+        "cum_dc":  62560,
+        "cum_flgp":  56867
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  74.15,
+        "cum_ltv":  1114353,
+        "cum_dc":  69919,
+        "cum_flgp":  63296
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  72.57,
+        "cum_ltv":  1221831,
+        "cum_dc":  77427,
+        "cum_flgp":  69898
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  69.56,
+        "cum_ltv":  1324153,
+        "cum_dc":  84901,
+        "cum_flgp":  76284
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  65.08,
+        "cum_ltv":  1415940,
+        "cum_dc":  91596,
+        "cum_flgp":  82003
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  53.63,
+        "cum_ltv":  1480932,
+        "cum_dc":  96072,
+        "cum_flgp":  85950
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  54332,
+        "cum_dc":  4076,
+        "cum_flgp":  1977
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  56.81,
+        "cum_ltv":  91609,
+        "cum_dc":  6364,
+        "cum_flgp":  3889
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  54.35,
+        "cum_ltv":  128776,
+        "cum_dc":  8657,
+        "cum_flgp":  6048
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  53.65,
+        "cum_ltv":  166556,
+        "cum_dc":  11098,
+        "cum_flgp":  8219
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  52.42,
+        "cum_ltv":  203877,
+        "cum_dc":  13581,
+        "cum_flgp":  10329
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  52.9,
+        "cum_ltv":  242769,
+        "cum_dc":  16200,
+        "cum_flgp":  12501
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  51.9,
+        "cum_ltv":  281146,
+        "cum_dc":  18916,
+        "cum_flgp":  14504
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  52.44,
+        "cum_ltv":  320847,
+        "cum_dc":  21779,
+        "cum_flgp":  16524
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  50.76,
+        "cum_ltv":  359371,
+        "cum_dc":  24641,
+        "cum_flgp":  18578
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  49.58,
+        "cum_ltv":  397038,
+        "cum_dc":  27597,
+        "cum_flgp":  20672
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  45.67,
+        "cum_ltv":  431837,
+        "cum_dc":  30362,
+        "cum_flgp":  22663
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  42.87,
+        "cum_ltv":  464582,
+        "cum_dc":  33031,
+        "cum_flgp":  24476
+    },
+    {
+        "brand":  "반올림피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  34.4,
+        "cum_ltv":  489412,
+        "cum_dc":  34968,
+        "cum_flgp":  25798
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  47997,
+        "cum_dc":  13788,
+        "cum_flgp":  -4488
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  40.4,
+        "cum_ltv":  82316,
+        "cum_dc":  18274,
+        "cum_flgp":  -3810
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  31.34,
+        "cum_ltv":  108529,
+        "cum_dc":  21103,
+        "cum_flgp":  -2832
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  28.89,
+        "cum_ltv":  133463,
+        "cum_dc":  23953,
+        "cum_flgp":  -1964
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  28.27,
+        "cum_ltv":  159750,
+        "cum_dc":  26888,
+        "cum_flgp":  -1222
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  27.75,
+        "cum_ltv":  184899,
+        "cum_dc":  29606,
+        "cum_flgp":  -496
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  27.45,
+        "cum_ltv":  209238,
+        "cum_dc":  32358,
+        "cum_flgp":  213
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  28.77,
+        "cum_ltv":  235289,
+        "cum_dc":  35474,
+        "cum_flgp":  1060
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  27.48,
+        "cum_ltv":  260319,
+        "cum_dc":  38339,
+        "cum_flgp":  2060
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  27.39,
+        "cum_ltv":  284355,
+        "cum_dc":  41491,
+        "cum_flgp":  2822
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  17.76,
+        "cum_ltv":  295837,
+        "cum_dc":  42816,
+        "cum_flgp":  3276
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  20.12,
+        "cum_ltv":  310941,
+        "cum_dc":  44659,
+        "cum_flgp":  3891
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  11.72,
+        "cum_ltv":  318849,
+        "cum_dc":  45595,
+        "cum_flgp":  4241
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  143798,
+        "cum_dc":  17724,
+        "cum_flgp":  4838
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  84.83,
+        "cum_ltv":  268936,
+        "cum_dc":  30590,
+        "cum_flgp":  9470
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  82.84,
+        "cum_ltv":  391304,
+        "cum_dc":  43226,
+        "cum_flgp":  14133
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  81.52,
+        "cum_ltv":  510701,
+        "cum_dc":  55811,
+        "cum_flgp":  18518
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  80.94,
+        "cum_ltv":  629494,
+        "cum_dc":  68731,
+        "cum_flgp":  22685
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  79.27,
+        "cum_ltv":  746168,
+        "cum_dc":  81631,
+        "cum_flgp":  26455
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  77.87,
+        "cum_ltv":  860347,
+        "cum_dc":  94092,
+        "cum_flgp":  29799
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  76.67,
+        "cum_ltv":  970627,
+        "cum_dc":  105847,
+        "cum_flgp":  33523
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  74.53,
+        "cum_ltv":  1076778,
+        "cum_dc":  117748,
+        "cum_flgp":  37598
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  72.26,
+        "cum_ltv":  1177732,
+        "cum_dc":  129519,
+        "cum_flgp":  41815
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  69.94,
+        "cum_ltv":  1273766,
+        "cum_dc":  140745,
+        "cum_flgp":  46058
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  60.37,
+        "cum_ltv":  1347450,
+        "cum_dc":  149077,
+        "cum_flgp":  49350
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  42.1,
+        "cum_ltv":  1381840,
+        "cum_dc":  152153,
+        "cum_flgp":  51022
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  47855,
+        "cum_dc":  7661,
+        "cum_flgp":  964
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  58.77,
+        "cum_ltv":  85010,
+        "cum_dc":  11185,
+        "cum_flgp":  2438
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  54.69,
+        "cum_ltv":  120461,
+        "cum_dc":  14472,
+        "cum_flgp":  3982
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  53.87,
+        "cum_ltv":  156164,
+        "cum_dc":  17821,
+        "cum_flgp":  5564
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  54.25,
+        "cum_ltv":  192694,
+        "cum_dc":  21393,
+        "cum_flgp":  7109
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  53.69,
+        "cum_ltv":  229869,
+        "cum_dc":  25158,
+        "cum_flgp":  8600
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  51.94,
+        "cum_ltv":  266195,
+        "cum_dc":  28876,
+        "cum_flgp":  9906
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  52.53,
+        "cum_ltv":  303344,
+        "cum_dc":  32642,
+        "cum_flgp":  11223
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  51.16,
+        "cum_ltv":  339435,
+        "cum_dc":  36419,
+        "cum_flgp":  12647
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  50.64,
+        "cum_ltv":  375588,
+        "cum_dc":  40495,
+        "cum_flgp":  14108
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  47.69,
+        "cum_ltv":  410181,
+        "cum_dc":  44371,
+        "cum_flgp":  15617
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  43.51,
+        "cum_ltv":  441257,
+        "cum_dc":  47971,
+        "cum_flgp":  16859
+    },
+    {
+        "brand":  "빽보이피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  26.27,
+        "cum_ltv":  457300,
+        "cum_dc":  49795,
+        "cum_flgp":  17423
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  54781,
+        "cum_dc":  14271,
+        "cum_flgp":  -6019
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  36.2,
+        "cum_ltv":  83819,
+        "cum_dc":  16744,
+        "cum_flgp":  -4865
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  30.44,
+        "cum_ltv":  109575,
+        "cum_dc":  18612,
+        "cum_flgp":  -3381
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  28.24,
+        "cum_ltv":  134275,
+        "cum_dc":  20487,
+        "cum_flgp":  -2042
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  26.38,
+        "cum_ltv":  157391,
+        "cum_dc":  22215,
+        "cum_flgp":  -835
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  25.31,
+        "cum_ltv":  179638,
+        "cum_dc":  23985,
+        "cum_flgp":  285
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  26.01,
+        "cum_ltv":  203055,
+        "cum_dc":  25934,
+        "cum_flgp":  1450
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  26.56,
+        "cum_ltv":  227922,
+        "cum_dc":  28062,
+        "cum_flgp":  2712
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  24.56,
+        "cum_ltv":  250546,
+        "cum_dc":  29975,
+        "cum_flgp":  3840
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  22.3,
+        "cum_ltv":  269308,
+        "cum_dc":  31671,
+        "cum_flgp":  4806
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  19.11,
+        "cum_ltv":  285165,
+        "cum_dc":  32982,
+        "cum_flgp":  5782
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  19.89,
+        "cum_ltv":  302146,
+        "cum_dc":  34350,
+        "cum_flgp":  6845
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  18.48,
+        "cum_ltv":  317816,
+        "cum_dc":  35716,
+        "cum_flgp":  7718
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  146379,
+        "cum_dc":  9328,
+        "cum_flgp":  7764
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  83.73,
+        "cum_ltv":  270646,
+        "cum_dc":  16746,
+        "cum_flgp":  14743
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  82.6,
+        "cum_ltv":  394287,
+        "cum_dc":  24479,
+        "cum_flgp":  22288
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  80.53,
+        "cum_ltv":  514032,
+        "cum_dc":  32230,
+        "cum_flgp":  29458
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  78.75,
+        "cum_ltv":  629654,
+        "cum_dc":  39852,
+        "cum_flgp":  36339
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  77,
+        "cum_ltv":  742635,
+        "cum_dc":  47363,
+        "cum_flgp":  42966
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  77,
+        "cum_ltv":  856849,
+        "cum_dc":  55133,
+        "cum_flgp":  49579
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  76.52,
+        "cum_ltv":  970674,
+        "cum_dc":  62962,
+        "cum_flgp":  55834
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  73.34,
+        "cum_ltv":  1077594,
+        "cum_dc":  70297,
+        "cum_flgp":  61973
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  72.14,
+        "cum_ltv":  1180483,
+        "cum_dc":  77647,
+        "cum_flgp":  68185
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  67.75,
+        "cum_ltv":  1275247,
+        "cum_dc":  84725,
+        "cum_flgp":  74009
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  65.75,
+        "cum_ltv":  1367085,
+        "cum_dc":  91720,
+        "cum_flgp":  79674
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  58.73,
+        "cum_ltv":  1444210,
+        "cum_dc":  97918,
+        "cum_flgp":  84129
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  52154,
+        "cum_dc":  4739,
+        "cum_flgp":  2224
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  56.31,
+        "cum_ltv":  88560,
+        "cum_dc":  6922,
+        "cum_flgp":  4198
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  55.17,
+        "cum_ltv":  125863,
+        "cum_dc":  9268,
+        "cum_flgp":  6438
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  54,
+        "cum_ltv":  163211,
+        "cum_dc":  11777,
+        "cum_flgp":  8637
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  52.56,
+        "cum_ltv":  199858,
+        "cum_dc":  14328,
+        "cum_flgp":  10772
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  52.17,
+        "cum_ltv":  237161,
+        "cum_dc":  17001,
+        "cum_flgp":  12884
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  51.08,
+        "cum_ltv":  274114,
+        "cum_dc":  19706,
+        "cum_flgp":  14884
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  52.35,
+        "cum_ltv":  313074,
+        "cum_dc":  22659,
+        "cum_flgp":  16846
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  49.39,
+        "cum_ltv":  350108,
+        "cum_dc":  25474,
+        "cum_flgp":  18801
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  49.63,
+        "cum_ltv":  387117,
+        "cum_dc":  28431,
+        "cum_flgp":  20837
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  46.4,
+        "cum_ltv":  422059,
+        "cum_dc":  31355,
+        "cum_flgp":  22764
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  42.96,
+        "cum_ltv":  454551,
+        "cum_dc":  34055,
+        "cum_flgp":  24574
+    },
+    {
+        "brand":  "청년피자",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  38.72,
+        "cum_ltv":  483297,
+        "cum_dc":  36571,
+        "cum_flgp":  26059
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  58963,
+        "cum_dc":  10671,
+        "cum_flgp":  -4300
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  33.79,
+        "cum_ltv":  87557,
+        "cum_dc":  12917,
+        "cum_flgp":  -3363
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  29,
+        "cum_ltv":  113219,
+        "cum_dc":  14696,
+        "cum_flgp":  -2022
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  26.97,
+        "cum_ltv":  137388,
+        "cum_dc":  16434,
+        "cum_flgp":  -780
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  24.33,
+        "cum_ltv":  159410,
+        "cum_dc":  17999,
+        "cum_flgp":  364
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  24.33,
+        "cum_ltv":  180684,
+        "cum_dc":  19496,
+        "cum_flgp":  1530
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  21.42,
+        "cum_ltv":  200974,
+        "cum_dc":  20950,
+        "cum_flgp":  2682
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  23.21,
+        "cum_ltv":  221984,
+        "cum_dc":  22488,
+        "cum_flgp":  3780
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  21.76,
+        "cum_ltv":  241712,
+        "cum_dc":  23985,
+        "cum_flgp":  4895
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  20.68,
+        "cum_ltv":  258665,
+        "cum_dc":  25349,
+        "cum_flgp":  5833
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  18.3,
+        "cum_ltv":  272800,
+        "cum_dc":  26713,
+        "cum_flgp":  6516
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  17.27,
+        "cum_ltv":  287018,
+        "cum_dc":  27901,
+        "cum_flgp":  7357
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  18.8,
+        "cum_ltv":  300030,
+        "cum_dc":  29014,
+        "cum_flgp":  8164
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  174516,
+        "cum_dc":  8702,
+        "cum_flgp":  9441
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  82.93,
+        "cum_ltv":  317425,
+        "cum_dc":  16900,
+        "cum_flgp":  17402
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  81.8,
+        "cum_ltv":  459239,
+        "cum_dc":  25425,
+        "cum_flgp":  25931
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  79.07,
+        "cum_ltv":  594112,
+        "cum_dc":  33787,
+        "cum_flgp":  33888
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  77.67,
+        "cum_ltv":  726027,
+        "cum_dc":  42051,
+        "cum_flgp":  41664
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  75.69,
+        "cum_ltv":  853385,
+        "cum_dc":  50106,
+        "cum_flgp":  49170
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  75.76,
+        "cum_ltv":  981777,
+        "cum_dc":  58333,
+        "cum_flgp":  56698
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  74.74,
+        "cum_ltv":  1108358,
+        "cum_dc":  66448,
+        "cum_flgp":  63824
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  71.61,
+        "cum_ltv":  1226659,
+        "cum_dc":  74088,
+        "cum_flgp":  70781
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  68.8,
+        "cum_ltv":  1335319,
+        "cum_dc":  81298,
+        "cum_flgp":  77580
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  65.95,
+        "cum_ltv":  1439695,
+        "cum_dc":  88447,
+        "cum_flgp":  84291
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  63.78,
+        "cum_ltv":  1540210,
+        "cum_dc":  95361,
+        "cum_flgp":  90900
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  57.5,
+        "cum_ltv":  1623664,
+        "cum_dc":  101254,
+        "cum_flgp":  96172
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  61316,
+        "cum_dc":  3236,
+        "cum_flgp":  2519
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  52.52,
+        "cum_ltv":  98168,
+        "cum_dc":  5196,
+        "cum_flgp":  4481
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  50.6,
+        "cum_ltv":  135255,
+        "cum_dc":  7258,
+        "cum_flgp":  6673
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  49.79,
+        "cum_ltv":  172870,
+        "cum_dc":  9484,
+        "cum_flgp":  8856
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  48.41,
+        "cum_ltv":  209414,
+        "cum_dc":  11729,
+        "cum_flgp":  10951
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  48.42,
+        "cum_ltv":  246781,
+        "cum_dc":  14073,
+        "cum_flgp":  13078
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  46.62,
+        "cum_ltv":  283115,
+        "cum_dc":  16423,
+        "cum_flgp":  15076
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  48.5,
+        "cum_ltv":  322154,
+        "cum_dc":  19033,
+        "cum_flgp":  17106
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  45.41,
+        "cum_ltv":  358844,
+        "cum_dc":  21514,
+        "cum_flgp":  19079
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  44.4,
+        "cum_ltv":  394762,
+        "cum_dc":  24038,
+        "cum_flgp":  21152
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  41.77,
+        "cum_ltv":  428223,
+        "cum_dc":  26492,
+        "cum_flgp":  23100
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  39.62,
+        "cum_ltv":  460121,
+        "cum_dc":  28749,
+        "cum_flgp":  25061
+    },
+    {
+        "brand":  "파파존스",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  35.3,
+        "cum_ltv":  487998,
+        "cum_dc":  30859,
+        "cum_flgp":  26659
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  48565,
+        "cum_dc":  11035,
+        "cum_flgp":  -4760
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  37.93,
+        "cum_ltv":  78104,
+        "cum_dc":  13479,
+        "cum_flgp":  -3664
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  32.13,
+        "cum_ltv":  103594,
+        "cum_dc":  15288,
+        "cum_flgp":  -2281
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  30.69,
+        "cum_ltv":  127882,
+        "cum_dc":  17080,
+        "cum_flgp":  -946
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  29.72,
+        "cum_ltv":  151573,
+        "cum_dc":  18810,
+        "cum_flgp":  365
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  29.03,
+        "cum_ltv":  174463,
+        "cum_dc":  20503,
+        "cum_flgp":  1641
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  28.67,
+        "cum_ltv":  197404,
+        "cum_dc":  22300,
+        "cum_flgp":  2833
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  28.77,
+        "cum_ltv":  220204,
+        "cum_dc":  24178,
+        "cum_flgp":  3931
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  28.77,
+        "cum_ltv":  242735,
+        "cum_dc":  25991,
+        "cum_flgp":  5095
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  27.23,
+        "cum_ltv":  263487,
+        "cum_dc":  27857,
+        "cum_flgp":  6113
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  25.1,
+        "cum_ltv":  283543,
+        "cum_dc":  29595,
+        "cum_flgp":  7105
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  23.96,
+        "cum_ltv":  302752,
+        "cum_dc":  31199,
+        "cum_flgp":  8120
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  22.46,
+        "cum_ltv":  320157,
+        "cum_dc":  32734,
+        "cum_flgp":  9015
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  139486,
+        "cum_dc":  7827,
+        "cum_flgp":  7278
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  82.77,
+        "cum_ltv":  260486,
+        "cum_dc":  15273,
+        "cum_flgp":  13816
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  81.22,
+        "cum_ltv":  379948,
+        "cum_dc":  22895,
+        "cum_flgp":  20789
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  79.33,
+        "cum_ltv":  496474,
+        "cum_dc":  30598,
+        "cum_flgp":  27538
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  77.69,
+        "cum_ltv":  610056,
+        "cum_dc":  38233,
+        "cum_flgp":  34183
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  76.2,
+        "cum_ltv":  721689,
+        "cum_dc":  45824,
+        "cum_flgp":  40641
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  75.17,
+        "cum_ltv":  831594,
+        "cum_dc":  53395,
+        "cum_flgp":  46896
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  73.77,
+        "cum_ltv":  939037,
+        "cum_dc":  60804,
+        "cum_flgp":  52815
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  71.57,
+        "cum_ltv":  1041634,
+        "cum_dc":  67865,
+        "cum_flgp":  58742
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  70.26,
+        "cum_ltv":  1140955,
+        "cum_dc":  74926,
+        "cum_flgp":  64809
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  67.35,
+        "cum_ltv":  1236244,
+        "cum_dc":  81894,
+        "cum_flgp":  70785
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  63.53,
+        "cum_ltv":  1323633,
+        "cum_dc":  88298,
+        "cum_flgp":  76279
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  55.93,
+        "cum_ltv":  1395471,
+        "cum_dc":  93656,
+        "cum_flgp":  80610
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  49421,
+        "cum_dc":  3342,
+        "cum_flgp":  1825
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  55.76,
+        "cum_ltv":  85338,
+        "cum_dc":  5476,
+        "cum_flgp":  3677
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  54.13,
+        "cum_ltv":  121653,
+        "cum_dc":  7729,
+        "cum_flgp":  5770
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  52.86,
+        "cum_ltv":  158349,
+        "cum_dc":  10128,
+        "cum_flgp":  7892
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  51.82,
+        "cum_ltv":  194695,
+        "cum_dc":  12597,
+        "cum_flgp":  9994
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  51.37,
+        "cum_ltv":  231663,
+        "cum_dc":  15194,
+        "cum_flgp":  12068
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  50.05,
+        "cum_ltv":  268313,
+        "cum_dc":  17817,
+        "cum_flgp":  14061
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  50.38,
+        "cum_ltv":  305890,
+        "cum_dc":  20549,
+        "cum_flgp":  15995
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  48.53,
+        "cum_ltv":  342398,
+        "cum_dc":  23206,
+        "cum_flgp":  17973
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  48.11,
+        "cum_ltv":  378472,
+        "cum_dc":  25984,
+        "cum_flgp":  20011
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  46.41,
+        "cum_ltv":  413799,
+        "cum_dc":  28821,
+        "cum_flgp":  22052
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  42.13,
+        "cum_ltv":  445829,
+        "cum_dc":  31384,
+        "cum_flgp":  23906
+    },
+    {
+        "brand":  "피나치공",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  36.64,
+        "cum_ltv":  473157,
+        "cum_dc":  33685,
+        "cum_flgp":  25328
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  45928,
+        "cum_dc":  11224,
+        "cum_flgp":  -5364
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  38.07,
+        "cum_ltv":  74559,
+        "cum_dc":  13661,
+        "cum_flgp":  -4411
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  32.32,
+        "cum_ltv":  100507,
+        "cum_dc":  15559,
+        "cum_flgp":  -3036
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  31.01,
+        "cum_ltv":  124998,
+        "cum_dc":  17421,
+        "cum_flgp":  -1752
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  29.68,
+        "cum_ltv":  148938,
+        "cum_dc":  19243,
+        "cum_flgp":  -489
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  28.28,
+        "cum_ltv":  172401,
+        "cum_dc":  21029,
+        "cum_flgp":  720
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  27.83,
+        "cum_ltv":  195510,
+        "cum_dc":  22835,
+        "cum_flgp":  1862
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  29.48,
+        "cum_ltv":  219686,
+        "cum_dc":  24764,
+        "cum_flgp":  2974
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  27.99,
+        "cum_ltv":  243544,
+        "cum_dc":  26650,
+        "cum_flgp":  4139
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  27.68,
+        "cum_ltv":  266104,
+        "cum_dc":  28428,
+        "cum_flgp":  5412
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  24.5,
+        "cum_ltv":  285965,
+        "cum_dc":  30088,
+        "cum_flgp":  6543
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  23.58,
+        "cum_ltv":  304984,
+        "cum_dc":  31752,
+        "cum_flgp":  7621
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  22.58,
+        "cum_ltv":  321746,
+        "cum_dc":  33343,
+        "cum_flgp":  8446
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  141005,
+        "cum_dc":  9027,
+        "cum_flgp":  6792
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  82.73,
+        "cum_ltv":  263621,
+        "cum_dc":  17396,
+        "cum_flgp":  12891
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  81.06,
+        "cum_ltv":  384429,
+        "cum_dc":  25900,
+        "cum_flgp":  19353
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  78.9,
+        "cum_ltv":  501180,
+        "cum_dc":  34347,
+        "cum_flgp":  25570
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  77.09,
+        "cum_ltv":  614434,
+        "cum_dc":  42615,
+        "cum_flgp":  31608
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  74.59,
+        "cum_ltv":  724248,
+        "cum_dc":  50667,
+        "cum_flgp":  37373
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  73.57,
+        "cum_ltv":  833120,
+        "cum_dc":  58671,
+        "cum_flgp":  42920
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  73.97,
+        "cum_ltv":  943864,
+        "cum_dc":  66779,
+        "cum_flgp":  48367
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  72.36,
+        "cum_ltv":  1050872,
+        "cum_dc":  74668,
+        "cum_flgp":  53969
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  70.3,
+        "cum_ltv":  1152309,
+        "cum_dc":  82333,
+        "cum_flgp":  59744
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  67.32,
+        "cum_ltv":  1249150,
+        "cum_dc":  89848,
+        "cum_flgp":  65491
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  64.23,
+        "cum_ltv":  1339296,
+        "cum_dc":  96897,
+        "cum_flgp":  70851
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  55.93,
+        "cum_ltv":  1410775,
+        "cum_dc":  102608,
+        "cum_flgp":  74885
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  45594,
+        "cum_dc":  3454,
+        "cum_flgp":  1567
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  56.07,
+        "cum_ltv":  80994,
+        "cum_dc":  5742,
+        "cum_flgp":  3284
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  53.81,
+        "cum_ltv":  116625,
+        "cum_dc":  8104,
+        "cum_flgp":  5224
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  52.55,
+        "cum_ltv":  152410,
+        "cum_dc":  10616,
+        "cum_flgp":  7170
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  51.48,
+        "cum_ltv":  188200,
+        "cum_dc":  13173,
+        "cum_flgp":  9120
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  50.26,
+        "cum_ltv":  224135,
+        "cum_dc":  15780,
+        "cum_flgp":  11037
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  48.01,
+        "cum_ltv":  258542,
+        "cum_dc":  18306,
+        "cum_flgp":  12779
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  50.24,
+        "cum_ltv":  295800,
+        "cum_dc":  21079,
+        "cum_flgp":  14562
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  49.3,
+        "cum_ltv":  332774,
+        "cum_dc":  23851,
+        "cum_flgp":  16433
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  48.33,
+        "cum_ltv":  368894,
+        "cum_dc":  26695,
+        "cum_flgp":  18380
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  46.09,
+        "cum_ltv":  404091,
+        "cum_dc":  29531,
+        "cum_flgp":  20366
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  43.01,
+        "cum_ltv":  436763,
+        "cum_dc":  32165,
+        "cum_flgp":  22229
+    },
+    {
+        "brand":  "피자스쿨",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  37.06,
+        "cum_ltv":  464826,
+        "cum_dc":  34588,
+        "cum_flgp":  23678
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  53328,
+        "cum_dc":  11118,
+        "cum_flgp":  -4586
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  32.3,
+        "cum_ltv":  76857,
+        "cum_dc":  13074,
+        "cum_flgp":  -3716
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  26.38,
+        "cum_ltv":  96823,
+        "cum_dc":  14395,
+        "cum_flgp":  -2542
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  24.93,
+        "cum_ltv":  116559,
+        "cum_dc":  15776,
+        "cum_flgp":  -1322
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  23.34,
+        "cum_ltv":  134448,
+        "cum_dc":  17059,
+        "cum_flgp":  -233
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  23.5,
+        "cum_ltv":  153299,
+        "cum_dc":  18388,
+        "cum_flgp":  855
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  22.31,
+        "cum_ltv":  170133,
+        "cum_dc":  19677,
+        "cum_flgp":  1780
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  21.61,
+        "cum_ltv":  187348,
+        "cum_dc":  20890,
+        "cum_flgp":  2789
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  21.14,
+        "cum_ltv":  204136,
+        "cum_dc":  22181,
+        "cum_flgp":  3797
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  20.25,
+        "cum_ltv":  220383,
+        "cum_dc":  23548,
+        "cum_flgp":  4734
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  17.26,
+        "cum_ltv":  233455,
+        "cum_dc":  24526,
+        "cum_flgp":  5499
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  15.49,
+        "cum_ltv":  244570,
+        "cum_dc":  25352,
+        "cum_flgp":  6195
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  16.09,
+        "cum_ltv":  256674,
+        "cum_dc":  26398,
+        "cum_flgp":  6710
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  153050,
+        "cum_dc":  10613,
+        "cum_flgp":  7220
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  82.7,
+        "cum_ltv":  279182,
+        "cum_dc":  19286,
+        "cum_flgp":  13450
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  79.8,
+        "cum_ltv":  399102,
+        "cum_dc":  27439,
+        "cum_flgp":  20191
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  79.66,
+        "cum_ltv":  520764,
+        "cum_dc":  36232,
+        "cum_flgp":  27131
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  78.32,
+        "cum_ltv":  640128,
+        "cum_dc":  45102,
+        "cum_flgp":  34060
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  76.85,
+        "cum_ltv":  757271,
+        "cum_dc":  53864,
+        "cum_flgp":  40857
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  71.93,
+        "cum_ltv":  859487,
+        "cum_dc":  60944,
+        "cum_flgp":  46853
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  71.31,
+        "cum_ltv":  963466,
+        "cum_dc":  67690,
+        "cum_flgp":  52954
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  70.94,
+        "cum_ltv":  1067187,
+        "cum_dc":  74399,
+        "cum_flgp":  59366
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  69.24,
+        "cum_ltv":  1166411,
+        "cum_dc":  80974,
+        "cum_flgp":  65901
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  64.69,
+        "cum_ltv":  1257569,
+        "cum_dc":  87164,
+        "cum_flgp":  72034
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  62.21,
+        "cum_ltv":  1344881,
+        "cum_dc":  93033,
+        "cum_flgp":  78002
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  55.6,
+        "cum_ltv":  1419309,
+        "cum_dc":  98199,
+        "cum_flgp":  82787
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  55386,
+        "cum_dc":  3917,
+        "cum_flgp":  2064
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  53.52,
+        "cum_ltv":  90367,
+        "cum_dc":  6072,
+        "cum_flgp":  3858
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  51.15,
+        "cum_ltv":  124772,
+        "cum_dc":  8184,
+        "cum_flgp":  5870
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  51.02,
+        "cum_ltv":  160059,
+        "cum_dc":  10513,
+        "cum_flgp":  7915
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  49.24,
+        "cum_ltv":  194544,
+        "cum_dc":  12880,
+        "cum_flgp":  9925
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  49.88,
+        "cum_ltv":  230644,
+        "cum_dc":  15418,
+        "cum_flgp":  11959
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  47.49,
+        "cum_ltv":  265005,
+        "cum_dc":  17863,
+        "cum_flgp":  13840
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  47.41,
+        "cum_ltv":  299932,
+        "cum_dc":  20294,
+        "cum_flgp":  15700
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  46.67,
+        "cum_ltv":  334479,
+        "cum_dc":  22721,
+        "cum_flgp":  17659
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  46.01,
+        "cum_ltv":  368672,
+        "cum_dc":  25223,
+        "cum_flgp":  19695
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  42.81,
+        "cum_ltv":  400870,
+        "cum_dc":  27702,
+        "cum_flgp":  21633
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  38.45,
+        "cum_ltv":  429217,
+        "cum_dc":  29815,
+        "cum_flgp":  23359
+    },
+    {
+        "brand":  "피자알볼로",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  34.64,
+        "cum_ltv":  454537,
+        "cum_dc":  31770,
+        "cum_flgp":  24808
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  57401,
+        "cum_dc":  10803,
+        "cum_flgp":  -3750
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  1,
+        "retention":  33.31,
+        "cum_ltv":  85469,
+        "cum_dc":  13057,
+        "cum_flgp":  -2672
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  2,
+        "retention":  27.35,
+        "cum_ltv":  108644,
+        "cum_dc":  14771,
+        "cum_flgp":  -1419
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  3,
+        "retention":  25.81,
+        "cum_ltv":  130344,
+        "cum_dc":  16440,
+        "cum_flgp":  -280
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  4,
+        "retention":  23.59,
+        "cum_ltv":  152263,
+        "cum_dc":  18017,
+        "cum_flgp":  970
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  5,
+        "retention":  23.41,
+        "cum_ltv":  174395,
+        "cum_dc":  19627,
+        "cum_flgp":  2213
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  6,
+        "retention":  22.48,
+        "cum_ltv":  196332,
+        "cum_dc":  21237,
+        "cum_flgp":  3399
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  7,
+        "retention":  23.26,
+        "cum_ltv":  218257,
+        "cum_dc":  23078,
+        "cum_flgp":  4320
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  8,
+        "retention":  23.21,
+        "cum_ltv":  239428,
+        "cum_dc":  24886,
+        "cum_flgp":  5287
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  9,
+        "retention":  21.79,
+        "cum_ltv":  258714,
+        "cum_dc":  26411,
+        "cum_flgp":  6353
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  10,
+        "retention":  19.94,
+        "cum_ltv":  277064,
+        "cum_dc":  28005,
+        "cum_flgp":  7385
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  11,
+        "retention":  18.97,
+        "cum_ltv":  293892,
+        "cum_dc":  29565,
+        "cum_flgp":  8245
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "0.첫주문",
+        "month_diff":  12,
+        "retention":  17.1,
+        "cum_ltv":  309172,
+        "cum_dc":  30946,
+        "cum_flgp":  9106
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  161040,
+        "cum_dc":  10091,
+        "cum_flgp":  7586
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  1,
+        "retention":  81.22,
+        "cum_ltv":  287711,
+        "cum_dc":  18967,
+        "cum_flgp":  13817
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  2,
+        "retention":  81.37,
+        "cum_ltv":  417292,
+        "cum_dc":  28295,
+        "cum_flgp":  20897
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  3,
+        "retention":  77.23,
+        "cum_ltv":  538262,
+        "cum_dc":  37155,
+        "cum_flgp":  27433
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  4,
+        "retention":  75.99,
+        "cum_ltv":  655962,
+        "cum_dc":  45667,
+        "cum_flgp":  33866
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  5,
+        "retention":  75.6,
+        "cum_ltv":  774334,
+        "cum_dc":  54301,
+        "cum_flgp":  40225
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  6,
+        "retention":  75.09,
+        "cum_ltv":  892257,
+        "cum_dc":  62913,
+        "cum_flgp":  46492
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  7,
+        "retention":  75.02,
+        "cum_ltv":  1010595,
+        "cum_dc":  71519,
+        "cum_flgp":  52537
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  8,
+        "retention":  72.64,
+        "cum_ltv":  1123635,
+        "cum_dc":  79771,
+        "cum_flgp":  58632
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  9,
+        "retention":  70.05,
+        "cum_ltv":  1228145,
+        "cum_dc":  87624,
+        "cum_flgp":  64721
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  10,
+        "retention":  67.06,
+        "cum_ltv":  1328022,
+        "cum_dc":  95407,
+        "cum_flgp":  70737
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  11,
+        "retention":  63.1,
+        "cum_ltv":  1417219,
+        "cum_dc":  102397,
+        "cum_flgp":  76125
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "1.활성",
+        "month_diff":  12,
+        "retention":  58.16,
+        "cum_ltv":  1494190,
+        "cum_dc":  108698,
+        "cum_flgp":  80539
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  0,
+        "retention":  100,
+        "cum_ltv":  57085,
+        "cum_dc":  3268,
+        "cum_flgp":  2265
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  1,
+        "retention":  51.69,
+        "cum_ltv":  91026,
+        "cum_dc":  5418,
+        "cum_flgp":  3886
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  2,
+        "retention":  51.39,
+        "cum_ltv":  126385,
+        "cum_dc":  7714,
+        "cum_flgp":  5824
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  3,
+        "retention":  49.3,
+        "cum_ltv":  160978,
+        "cum_dc":  10100,
+        "cum_flgp":  7707
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  4,
+        "retention":  48.07,
+        "cum_ltv":  195237,
+        "cum_dc":  12504,
+        "cum_flgp":  9568
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  5,
+        "retention":  48.04,
+        "cum_ltv":  230729,
+        "cum_dc":  15029,
+        "cum_flgp":  11469
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  6,
+        "retention":  46.88,
+        "cum_ltv":  265257,
+        "cum_dc":  17588,
+        "cum_flgp":  13197
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  7,
+        "retention":  48.54,
+        "cum_ltv":  301609,
+        "cum_dc":  20329,
+        "cum_flgp":  14869
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  8,
+        "retention":  46.87,
+        "cum_ltv":  337285,
+        "cum_dc":  23033,
+        "cum_flgp":  16655
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  9,
+        "retention":  45.87,
+        "cum_ltv":  372088,
+        "cum_dc":  25803,
+        "cum_flgp":  18520
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  10,
+        "retention":  42.57,
+        "cum_ltv":  404538,
+        "cum_dc":  28535,
+        "cum_flgp":  20294
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  11,
+        "retention":  41.23,
+        "cum_ltv":  436340,
+        "cum_dc":  31256,
+        "cum_flgp":  22000
+    },
+    {
+        "brand":  "피자헛",
+        "category":  "PIZZA",
+        "seg":  "2.이탈복귀",
+        "month_diff":  12,
+        "retention":  35.61,
+        "cum_ltv":  462809,
+        "cum_dc":  33712,
+        "cum_flgp":  23239
+    }
+]
+;
+const SEG_MAP = { first:'0.첫주문', active:'1.활성', ret:'2.이탈복귀' };
+const PALETTE = ['#9a2617','#e63946','#f4a261','#e9c46a','#2a9d8f','#457b9d','#264653','#9b5de5','#118ab2','#06d6a0'];
+const BRANDS  = [...new Set(RAW.map(function(d){return d.brand;}))].sort();
+const BC = {};
+BRANDS.forEach(function(b,i){ BC[b]=PALETTE[i%PALETTE.length]; });
+function getData(seg,md){ return RAW.filter(function(d){return d.seg===seg&&d.month_diff===md;}).sort(function(a,b){return b.retention-a.retention;}); }
+function getSeries(b,seg){ return RAW.filter(function(d){return d.brand===b&&d.seg===seg;}).sort(function(a,b){return a.month_diff-b.month_diff;}); }
+function pct(n){ return (n||0).toFixed(1)+'%'; }
+function won(n){ return (n||0).toLocaleString('ko-KR')+'원'; }
+const charts = {};
+const MONTHS = [0,1,2,3,4,5,6,7,8,9,10,11,12];
+
+function buildPanel(tabKey){
+  const seg = SEG_MAP[tabKey];
+  const rows12 = getData(seg,12);
+  const el = document.getElementById('panel-'+tabKey);
+  let html = '<div class="section-title">M+12 브랜드 순위 (잔존율 기준)</div><div class="card-grid">';
+  rows12.forEach(function(d,i){
+    const rc = i===0?'top1':i===1?'top2':i===2?'top3':(i>=rows12.length-2?'bot':'');
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    html += '<div class="card '+rc+'"><div class="rank">#'+(i+1)+' '+medal+'</div>'
+      +'<div class="brand-name">'+d.brand+'</div><div><span class="cat-badge">피자</span></div>'
+      +'<div class="metric"><span class="label">잔존율(M+12)</span><span class="value" style="color:#9a2617">'+pct(d.retention)+'</span></div>'
+      +'<div class="metric"><span class="label">누적 LTV</span><span class="value">'+won(d.cum_ltv)+'</span></div>'
+      +'<div class="metric"><span class="label">누적 할인비용</span><span class="value">'+won(d.cum_dc)+'</span></div>'
+      +'<div class="metric"><span class="label">누적 FLGP</span><span class="value '+(d.cum_flgp>=0?'pos':'neg')+'">'+won(d.cum_flgp)+'</span></div></div>';
+  });
+  html += '</div>';
+  const uid = tabKey;
+  html += '<div class="section-title">잔존율 추이 (M+0 → M+12)</div><div class="chart-full"><canvas id="c-ret-'+uid+'"></canvas></div>'
+    +'<div class="section-title">누적 인당 주문금액(LTV) 추이</div><div class="chart-full"><canvas id="c-ltv-'+uid+'"></canvas></div>'
+    +'<div class="section-title">M+12 브랜드 비교</div><div class="chart-row">'
+    +'<div class="chart-box"><h3>잔존율 (M+12)</h3><canvas id="c-rbar-'+uid+'"></canvas></div>'
+    +'<div class="chart-box"><h3>누적 FLGP (M+12)</h3><canvas id="c-fbar-'+uid+'"></canvas></div></div>';
+  const byLTV = [...rows12].sort(function(a,b){return b.cum_ltv-a.cum_ltv;});
+  html += '<div class="section-title">상세 데이터 (LTV 기준 정렬, M+12)</div><table>'
+    +'<thead><tr><th>브랜드</th><th>잔존율</th><th>누적 LTV</th><th>누적 할인비용</th><th>누적 FLGP</th></tr></thead><tbody>';
+  byLTV.forEach(function(d){
+    html += '<tr><td class="td-brand">'+d.brand+'</td><td>'+pct(d.retention)+'</td><td>'+won(d.cum_ltv)+'</td><td>'+won(d.cum_dc)+'</td>'
+      +'<td class="'+(d.cum_flgp>=0?'pos':'neg')+'">'+won(d.cum_flgp)+'</td></tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+
+  function mc(id,cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),cfg); }
+  mc('c-ret-'+uid,{ type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
+    datasets:BRANDS.map(function(b){ var s=getSeries(b,seg);
+      return { label:b, data:MONTHS.map(function(m){var r=s.find(function(x){return x.month_diff===m;}); return r?r.retention:null;}),
+        borderColor:BC[b], backgroundColor:BC[b]+'22', borderWidth:2, pointRadius:3, tension:0.3, spanGaps:false }; }) },
+    options:{ responsive:true, plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:8}},
+      tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toFixed(1)+'%';}}}},
+      scales:{y:{title:{display:true,text:'잔존율(%)'},min:0},x:{grid:{display:false}}} } });
+  mc('c-ltv-'+uid,{ type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
+    datasets:BRANDS.map(function(b){ var s=getSeries(b,seg);
+      return { label:b, data:MONTHS.map(function(m){var r=s.find(function(x){return x.month_diff===m;}); return r?r.cum_ltv:null;}),
+        borderColor:BC[b], backgroundColor:BC[b]+'22', borderWidth:2, pointRadius:3, tension:0.3, spanGaps:false }; }) },
+    options:{ responsive:true, plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:8}},
+      tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toLocaleString('ko-KR')+'원';}}}},
+      scales:{y:{title:{display:true,text:'누적 LTV(원)'},ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}},x:{grid:{display:false}}} } });
+  var retS=[...rows12].sort(function(a,b){return b.retention-a.retention;});
+  mc('c-rbar-'+uid,{ type:'bar', data:{ labels:retS.map(function(d){return d.brand;}),
+    datasets:[{data:retS.map(function(d){return d.retention;}), backgroundColor:retS.map(function(d){return BC[d.brand]+'cc';})}] },
+    options:{ indexAxis:'y', responsive:true, plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return (c.parsed.x||0).toFixed(1)+'%';}}}},
+      scales:{x:{title:{display:true,text:'%'},min:0},y:{ticks:{font:{size:11}}}} } });
+  var flS=[...rows12].sort(function(a,b){return b.cum_flgp-a.cum_flgp;});
+  mc('c-fbar-'+uid,{ type:'bar', data:{ labels:flS.map(function(d){return d.brand;}),
+    datasets:[{data:flS.map(function(d){return d.cum_flgp;}), backgroundColor:flS.map(function(d){return d.cum_flgp>=0?BC[d.brand]+'cc':'#fca5a5';})}] },
+    options:{ indexAxis:'y', responsive:true, plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return (c.parsed.x||0).toLocaleString('ko-KR')+'원';}}}},
+      scales:{x:{title:{display:true,text:'원'},ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}},y:{ticks:{font:{size:11}}}} } });
+}
+function switchTab(key){
+  document.querySelectorAll('.seg-tab').forEach(function(t,i){ t.classList.toggle('active',['first','active','ret'][i]===key); });
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('panel-'+key).classList.add('active');
+}
+buildPanel('first'); buildPanel('active'); buildPanel('ret');
+</script></body></html>
