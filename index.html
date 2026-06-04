@@ -52,7 +52,7 @@
 </head>
 <body>
 <header>
-  <h1>📊 카테고리 TOP1 브랜드 LTV / 잔존율 분석 <span style="font-size:14px;opacity:.7;">+ 스타벅스 비교</span></h1>
+  <h1>📊 카테고리 TOP1 브랜드 LTV / 잔존율 분석</h1>
   <p>코호트 기준: 25/03~26/03 | M+12 누적 | 할인비용: 우형부담(쿠폰+HVA+MFO+배민클럽) | 세그: 해당월 첫주문 기준</p>
   <nav style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap;">
     <span style="padding:7px 16px; border-radius:20px; font-size:13px; font-weight:700; background:white; color:#0f3460;">📊 카테고리 TOP1</span>
@@ -62,7 +62,7 @@
   </nav>
 </header>
 <div class="note">
-  ⚠️ M+12 잔존율·LTV는 <strong>25/03~25/05 코호트 기준</strong> (M+12 데이터 보유 코호트). 각 month_diff는 해당 시점 데이터 보유 코호트 기준으로 산출. 스타벅스는 <span style="color:#00704a;font-weight:700;">초록색</span>으로 강조.
+  ⚠️ M+12 잔존율·LTV는 <strong>25/03~25/05 코호트 기준</strong> (M+12 데이터 보유 코호트). 각 month_diff는 해당 시점 데이터 보유 코호트 기준으로 산출.
 </div>
 <div class="tabs">
   <div class="tab active" onclick="switchTab('first')">0. 첫주문</div>
@@ -74,7 +74,7 @@
 <div id="panel-ret" class="panel"></div>
 <br>
 <script>
-const RAW =[
+const RAW_ALL =[
     {
         "brand":  "BHC",
         "category":  "CHICKEN",
@@ -6320,6 +6320,7 @@ const RAW =[
 const SEG_MAP = { first:'0.첫주문', active:'1.활성', ret:'2.이탈복귀' };
 const CAT_KO  = { CHICKEN:'치킨',FASTFOOD:'패스트푸드',SNACK:'분식',ZZIM_TANG:'찜/탕',CHINESE:'중식',BAEKBAN:'백반/죽',DOSIRAK:'도시락',JOKBAL:'족발/보쌈',PIZZA:'피자',CAFE:'카페',JAPANESE:'일식',WESTERN:'양식',NIGHTSNACK:'야식',MEAT:'육류',ASIAN:'아시안',CAFE_CHAIN:'카페(스타벅스)' };
 const PALETTE = ['#e63946','#457b9d','#2a9d8f','#e9c46a','#f4a261','#264653','#a8dadc','#06d6a0','#ef476f','#ffd166','#118ab2','#073b4c','#9b5de5','#f15bb5','#00bbf9','#00704a'];
+const RAW = RAW_ALL.filter(function(d){return d.brand!=='스타벅스';});
 const BRANDS  = [...new Set(RAW.map(function(d){return d.brand;}))].sort();
 const BC      = {};
 BRANDS.forEach(function(b,i){ BC[b] = b==='스타벅스' ? '#00704a' : PALETTE[i%15]; });
@@ -6461,3 +6462,4 @@ buildPanel('first');
 buildPanel('active');
 buildPanel('ret');
 </script></body></html>
+
