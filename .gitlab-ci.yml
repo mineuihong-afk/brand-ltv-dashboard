@@ -1,0 +1,9 @@
+stages:
+  - deploy
+
+include:
+  - component: $CI_SERVER_FQDN/alattalatta/songbird/deploy@1.0.0
+    inputs:
+      needs: []
+      stage: deploy
+      outputdir: .
