@@ -70,6 +70,16 @@
   .placeholder .icon { font-size:48px; margin-bottom:16px; }
   .placeholder h2 { font-size:18px; color:#3b82f6; margin-bottom:10px; }
   .placeholder p { font-size:13px; line-height:1.7; color:#888; }
+  .filter-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:14px 16px; background:#f8f9fc; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:8px; }
+  .filter-label { font-size:13px; font-weight:700; color:#1a1a2e; margin-right:4px; }
+  .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600; color:#555; background:white; border:1.5px solid #dde2ec; cursor:pointer; user-select:none; transition:all .15s; }
+  .chip:hover { border-color:#aab4c5; }
+  .chip input { display:none; }
+  .chip .dot { width:9px; height:9px; border-radius:50%; background:var(--c); flex-shrink:0; opacity:.5; }
+  .chip.on { color:white; background:var(--c); border-color:var(--c); box-shadow:0 2px 6px rgba(0,0,0,.15); }
+  .chip.on .dot { background:white; opacity:1; }
+  .clear-btn { margin-left:auto; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; color:#9a2617; background:white; border:1.5px solid #e8c0b5; cursor:pointer; }
+  .clear-btn:hover { background:#fef2f2; }
 </style>
 </head>
 <body>
@@ -7993,7 +8003,7 @@ const RAW_BRAND = [
 ];
 const SEG_MAP = { first:'0.첫주문', active:'1.활성', ret:'2.이탈복귀' };
 const PALETTE = ['#9a2617','#e63946','#f4a261','#e9c46a','#2a9d8f','#457b9d','#264653','#9b5de5','#118ab2','#06d6a0'];
-const HIGHLIGHT = '피자헛';
+const HL = new Set();   // 체크된 브랜드(하이라이트 대상). 비어있으면 전체 일반 표시
 const HL_COLOR = '#e3000f';
 const charts = {};
 const MONTHS = [0,1,2,3,4,5,6,7,8,9,10,11,12];
@@ -8005,20 +8015,26 @@ function buildPanel(mode, tabKey){
   const RAW = mode==='platform' ? RAW_PLATFORM : RAW_BRAND;
   const seg = SEG_MAP[tabKey];
   const BRANDS = [...new Set(RAW.map(function(d){return d.brand;}))].sort();
-  const BC = {}; BRANDS.forEach(function(b,i){ BC[b]= b===HIGHLIGHT ? HL_COLOR : PALETTE[i%PALETTE.length]; });
+  const BC = {}; BRANDS.forEach(function(b,i){ BC[b]=PALETTE[i%PALETTE.length]; });
+  const anyHL = HL.size>0;
   function getData(md){ return RAW.filter(function(d){return d.seg===seg&&d.month_diff===md;}).sort(function(a,b){return b.retention-a.retention;}); }
   function getSeries(b){ return RAW.filter(function(d){return d.brand===b&&d.seg===seg;}).sort(function(a,b){return a.month_diff-b.month_diff;}); }
 
   const rows12 = getData(12);
   const el = document.getElementById(mode+'-panel-'+tabKey);
-  let html = '<div class="section-title">M+12 브랜드 순위 (잔존율 기준)</div><div class="card-grid">';
+  let html = '<div class="filter-bar"><span class="filter-label">🔍 브랜드 하이라이트</span>';
+  BRANDS.forEach(function(b){ var on=HL.has(b);
+    html += '<label class="chip'+(on?' on':'')+'" style="--c:'+BC[b]+'"><input type="checkbox" '+(on?'checked':'')+' onchange="toggleBrand(\''+b+'\')"><span class="dot"></span>'+b+'</label>';
+  });
+  html += '<button class="clear-btn" onclick="clearHL()">전체 해제</button></div>';
+  html += '<div class="section-title">M+12 브랜드 순위 (잔존율 기준)</div><div class="card-grid">';
   rows12.forEach(function(d,i){
     const rc = i===0?'top1':i===1?'top2':i===2?'top3':(i>=rows12.length-2?'bot':'');
     const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
-    const isHL = d.brand===HIGHLIGHT;
-    const hlStyle = isHL ? ' style="border:2.5px solid '+HL_COLOR+';box-shadow:0 0 0 3px rgba(227,0,15,.12);"' : '';
-    html += '<div class="card '+rc+'"'+hlStyle+'><div class="rank">#'+(i+1)+' '+medal+(isHL?' 🎯':'')+'</div>'
-      +'<div class="brand-name"'+(isHL?' style="color:'+HL_COLOR+'"':'')+'>'+d.brand+'</div><div><span class="cat-badge">피자</span></div>'
+    const sel = HL.has(d.brand); const dim = anyHL && !sel;
+    const cstyle = sel ? ' style="border:2.5px solid '+HL_COLOR+';box-shadow:0 0 0 3px rgba(227,0,15,.12);"' : (dim?' style="opacity:.4;"':'');
+    html += '<div class="card '+rc+'"'+cstyle+'><div class="rank">#'+(i+1)+' '+medal+(sel?' 🎯':'')+'</div>'
+      +'<div class="brand-name"'+(sel?' style="color:'+HL_COLOR+'"':'')+'>'+d.brand+'</div><div><span class="cat-badge">피자</span></div>'
       +'<div class="metric"><span class="label">잔존율(M+12)</span><span class="value" style="color:#9a2617">'+pct(d.retention)+'</span></div>'
       +'<div class="metric"><span class="label">누적 LTV</span><span class="value">'+won(d.cum_ltv)+'</span></div>'
       +'<div class="metric"><span class="label">누적 할인비용</span><span class="value">'+won(d.cum_dc)+'</span></div>'
@@ -8035,41 +8051,42 @@ function buildPanel(mode, tabKey){
   html += '<div class="section-title">상세 데이터 (LTV 기준 정렬, M+12)</div><table>'
     +'<thead><tr><th>브랜드</th><th>잔존율</th><th>누적 LTV</th><th>누적 할인비용</th><th>누적 FLGP</th></tr></thead><tbody>';
   byLTV.forEach(function(d){
-    var isHL=d.brand===HIGHLIGHT;
-    html += '<tr'+(isHL?' style="background:#fff0f1;font-weight:700;"':'')+'><td class="td-brand">'+(isHL?'🎯 ':'')+d.brand+'</td><td>'+pct(d.retention)+'</td><td>'+won(d.cum_ltv)+'</td><td>'+won(d.cum_dc)+'</td>'
+    var sel=HL.has(d.brand); var dim=anyHL&&!sel;
+    var rstyle = sel?' style="background:#fff0f1;font-weight:700;"':(dim?' style="opacity:.45;"':'');
+    html += '<tr'+rstyle+'><td class="td-brand">'+(sel?'🎯 ':'')+d.brand+'</td><td>'+pct(d.retention)+'</td><td>'+won(d.cum_ltv)+'</td><td>'+won(d.cum_dc)+'</td>'
       +'<td class="'+(d.cum_flgp>=0?'pos':'neg')+'">'+won(d.cum_flgp)+'</td></tr>';
   });
   html += '</tbody></table>';
   el.innerHTML = html;
 
   mc('c-ret-'+uid,{ type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
-    datasets:BRANDS.map(function(b){ var s=getSeries(b); var hl=b===HIGHLIGHT;
+    datasets:BRANDS.map(function(b){ var s=getSeries(b); var sel=HL.has(b); var dim=anyHL&&!sel;
       return { label:b, data:MONTHS.map(function(m){var r=s.find(function(x){return x.month_diff===m;}); return r?r.retention:null;}),
-        borderColor:BC[b], backgroundColor:BC[b]+'22', borderWidth:hl?4.5:1.3, pointRadius:hl?5:1.8, pointHoverRadius:hl?7:4, order:hl?0:1, tension:0.3, spanGaps:false }; }) },
+        borderColor:dim?'#d2d2d2':BC[b], backgroundColor:(dim?'#d2d2d2':BC[b])+'22', borderWidth:sel?4.5:(dim?1:2), pointRadius:sel?5:(dim?0:2.5), pointHoverRadius:sel?7:4, order:sel?0:(dim?2:1), tension:0.3, spanGaps:false }; }) },
     options:{ responsive:true, plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:8}},
       tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toFixed(1)+'%';}}}},
       scales:{y:{title:{display:true,text:'잔존율(%)'},min:0},x:{grid:{display:false}}} } });
   mc('c-ltv-'+uid,{ type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
-    datasets:BRANDS.map(function(b){ var s=getSeries(b); var hl=b===HIGHLIGHT;
+    datasets:BRANDS.map(function(b){ var s=getSeries(b); var sel=HL.has(b); var dim=anyHL&&!sel;
       return { label:b, data:MONTHS.map(function(m){var r=s.find(function(x){return x.month_diff===m;}); return r?r.cum_ltv:null;}),
-        borderColor:BC[b], backgroundColor:BC[b]+'22', borderWidth:hl?4.5:1.3, pointRadius:hl?5:1.8, pointHoverRadius:hl?7:4, order:hl?0:1, tension:0.3, spanGaps:false }; }) },
+        borderColor:dim?'#d2d2d2':BC[b], backgroundColor:(dim?'#d2d2d2':BC[b])+'22', borderWidth:sel?4.5:(dim?1:2), pointRadius:sel?5:(dim?0:2.5), pointHoverRadius:sel?7:4, order:sel?0:(dim?2:1), tension:0.3, spanGaps:false }; }) },
     options:{ responsive:true, plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:8}},
       tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toLocaleString('ko-KR')+'원';}}}},
       scales:{y:{title:{display:true,text:'누적 LTV(원)'},ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}},x:{grid:{display:false}}} } });
   var retS=[...rows12].sort(function(a,b){return b.retention-a.retention;});
   mc('c-rbar-'+uid,{ type:'bar', data:{ labels:retS.map(function(d){return d.brand;}),
     datasets:[{data:retS.map(function(d){return d.retention;}),
-      backgroundColor:retS.map(function(d){return d.brand===HIGHLIGHT?HL_COLOR:BC[d.brand]+'66';}),
-      borderColor:retS.map(function(d){return d.brand===HIGHLIGHT?'#7a000a':'transparent';}),
-      borderWidth:retS.map(function(d){return d.brand===HIGHLIGHT?2:0;})}] },
+      backgroundColor:retS.map(function(d){var sel=HL.has(d.brand);var dim=anyHL&&!sel;return sel?HL_COLOR:(dim?'#dcdcdc':BC[d.brand]+'66');}),
+      borderColor:retS.map(function(d){return HL.has(d.brand)?'#7a000a':'transparent';}),
+      borderWidth:retS.map(function(d){return HL.has(d.brand)?2:0;})}] },
     options:{ indexAxis:'y', responsive:true, plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return (c.parsed.x||0).toFixed(1)+'%';}}}},
       scales:{x:{title:{display:true,text:'%'},min:0},y:{ticks:{font:{size:11}}}} } });
   var flS=[...rows12].sort(function(a,b){return b.cum_flgp-a.cum_flgp;});
   mc('c-fbar-'+uid,{ type:'bar', data:{ labels:flS.map(function(d){return d.brand;}),
     datasets:[{data:flS.map(function(d){return d.cum_flgp;}),
-      backgroundColor:flS.map(function(d){return d.brand===HIGHLIGHT?HL_COLOR:(d.cum_flgp>=0?BC[d.brand]+'66':'#fca5a5');}),
-      borderColor:flS.map(function(d){return d.brand===HIGHLIGHT?'#7a000a':'transparent';}),
-      borderWidth:flS.map(function(d){return d.brand===HIGHLIGHT?2:0;})}] },
+      backgroundColor:flS.map(function(d){var sel=HL.has(d.brand);var dim=anyHL&&!sel;return sel?HL_COLOR:(dim?'#dcdcdc':(d.cum_flgp>=0?BC[d.brand]+'66':'#fca5a5'));}),
+      borderColor:flS.map(function(d){return HL.has(d.brand)?'#7a000a':'transparent';}),
+      borderWidth:flS.map(function(d){return HL.has(d.brand)?2:0;})}] },
     options:{ indexAxis:'y', responsive:true, plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return (c.parsed.x||0).toLocaleString('ko-KR')+'원';}}}},
       scales:{x:{title:{display:true,text:'원'},ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}},y:{ticks:{font:{size:11}}}} } });
 }
@@ -8119,6 +8136,14 @@ function switchTab(mode, key){
   view.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
   document.getElementById(mode+'-panel-'+key).classList.add('active');
 }
+
+function rebuildPanels(mode){ buildPanel(mode,'first'); buildPanel(mode,'active'); buildPanel(mode,'ret'); }
+function refresh(){
+  if(built.platform) rebuildPanels('platform');
+  if(built.brand && RAW_BRAND && RAW_BRAND.length>0) rebuildPanels('brand');
+}
+function toggleBrand(b){ if(HL.has(b)) HL.delete(b); else HL.add(b); refresh(); }
+function clearHL(){ HL.clear(); refresh(); }
 
 buildMode('platform');
 </script></body></html>
