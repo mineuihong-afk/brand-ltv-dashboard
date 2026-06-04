@@ -13,7 +13,18 @@
   header p  { font-size:13px; color:#e0b0a0; margin-top:6px; }
   header a  { color:white; font-size:12px; opacity:.7; text-decoration:none; border:1px solid rgba(255,255,255,.4); padding:6px 14px; border-radius:20px; }
   header a:hover { opacity:1; }
+
+  /* 상위 모드 탭 */
+  .mode-tabs { display:flex; gap:8px; padding:20px 40px 0; background:#e7eaf0; }
+  .mode-tab  { padding:13px 30px; border-radius:10px 10px 0 0; cursor:pointer; font-size:15px; font-weight:700; background:#cfd6e2; color:#667; display:flex; align-items:center; gap:8px; }
+  .mode-tab.active { background:#9a2617; color:white; box-shadow:0 -2px 10px rgba(154,38,23,.3); }
+  .mode-tab .sub { font-size:11px; font-weight:500; opacity:.8; }
+  .mode-view { display:none; }
+  .mode-view.active { display:block; }
+
   .note { background:#fffbe6; border-left:4px solid #f59e0b; padding:10px 16px; margin:16px 40px 0; font-size:12px; color:#555; border-radius:4px; }
+  .note.brandnote { background:#eef6ff; border-left-color:#3b82f6; }
+
   .seg-tabs { display:flex; gap:4px; padding:20px 40px 0; }
   .seg-tab  { padding:10px 24px; border-radius:8px 8px 0 0; cursor:pointer; font-size:14px; font-weight:600; background:#dde2ec; color:#555; }
   .seg-tab.active { background:white; color:#9a2617; box-shadow:0 -2px 8px rgba(0,0,0,.08); }
@@ -55,67 +66,91 @@
   .td-brand { text-align:left; font-weight:600; }
   .pos { color:#059669; font-weight:700; }
   .neg { color:#dc2626; font-weight:700; }
-  .up { color:#059669; } .dn { color:#dc2626; } .neu { color:#888; }
+  .placeholder { margin:40px; padding:60px 40px; background:white; border-radius:12px; border:2px dashed #b9c4d6; text-align:center; color:#667; }
+  .placeholder .icon { font-size:48px; margin-bottom:16px; }
+  .placeholder h2 { font-size:18px; color:#3b82f6; margin-bottom:10px; }
+  .placeholder p { font-size:13px; line-height:1.7; color:#888; }
 </style>
 </head>
 <body>
 <header>
   <div>
     <h1>🍕 피자 브랜드 LTV / 잔존율 분석</h1>
-    <p>피자 카테고리 10개 브랜드 비교 | 코호트 25/03~26/03 | M+12 누적 | 세그: 해당월 첫주문 기준</p>
+    <p>피자 카테고리 10개 브랜드 비교 | 코호트 2025/05~2026/05 | M+12 누적 | 세그: 해당월 첫주문 기준</p>
   </div>
   <a href="index.html">← 전체 브랜드 대시보드</a>
 </header>
-<div class="note">⚠️ M+12 지표는 <strong>25/03~25/05 코호트 기준</strong>(M+12 데이터 보유 코호트). 할인비용: 우형부담(쿠폰+HVA+MFO+배민클럽)</div>
 
-<!-- EXEC SUMMARY -->
-<div class="summary">
-  <div class="summary-head"><span style="font-size:18px;">📋</span>
-    <div><div style="font-size:15px;font-weight:800;">Executive Summary — 피자 10개 브랜드 비교</div>
-    <div style="font-size:12px;opacity:.75;margin-top:2px;">잔존율 / LTV / 수익성(FLGP) 종합</div></div>
+<!-- 상위 모드 탭 -->
+<div class="mode-tabs">
+  <div class="mode-tab active" onclick="switchMode('platform')">
+    <span>① 플랫폼 잔존율</span><span class="sub">진입 후 플랫폼 어디서든 재주문</span>
   </div>
-  <div class="summary-body">
-    <div class="verdict">
-      <strong style="color:#9a2617;">💡 핵심 판정</strong><br>
-      <strong>청년피자</strong>가 활성·이탈복귀 잔존율 1위로 재구매 충성도가 가장 높고,
-      <strong>파파존스</strong>는 전 세그 LTV·FLGP 최상위권으로 객단가·수익성이 가장 우수.
-      반면 <strong>빽보이피자</strong>는 전 세그 잔존율 최하위 + 할인비용 최고로, 할인 의존도가 높고 수익성이 가장 취약.
-      <strong>피자스쿨·피나치공</strong>은 첫주문 잔존율 1·2위로 신규 고객 유지에 강점.
-    </div>
-    <div class="seg3">
-      <div class="segcard"><h4>0. 첫주문 — 신규 유지</h4><div class="body">
-        <div class="segrow"><span style="color:#888">잔존율 1위</span><strong style="color:#059669">피자스쿨 22.6%</strong></div>
-        <div class="segrow"><span style="color:#888">LTV 1위</span><strong>노모어피자 34.8만</strong></div>
-        <div class="segrow"><span style="color:#888">FLGP 1위</span><strong>피자헛 9,106원</strong></div>
-        <div style="margin-top:10px;padding:7px 10px;background:#fef2f2;border-radius:6px;font-size:11px;color:#b91c1c;line-height:1.5;">⚠️ 빽보이피자 잔존율 11.7%로 최하위 — 첫 구매 후 이탈 심각</div>
-      </div></div>
-      <div class="segcard" style="border:2px solid #9a2617;"><h4 style="background:#9a2617;">1. 활성 — 헤비유저</h4><div class="body">
-        <div class="segrow"><span style="color:#888">잔존율 1위</span><strong style="color:#059669">청년피자 58.7%</strong></div>
-        <div class="segrow"><span style="color:#888">LTV 1위</span><strong>파파존스 162.4만</strong></div>
-        <div class="segrow"><span style="color:#888">FLGP 1위</span><strong>파파존스 96,172원</strong></div>
-        <div style="margin-top:10px;padding:7px 10px;background:#fef6f4;border-radius:6px;font-size:11px;color:#9a2617;line-height:1.5;">✅ 파파존스 객단가·수익성 모두 1위 — 프리미엄 헤비유저층 확보</div>
-      </div></div>
-      <div class="segcard"><h4>2. 이탈복귀 — 재활성</h4><div class="body">
-        <div class="segrow"><span style="color:#888">잔존율 1위</span><strong style="color:#059669">청년피자 38.7%</strong></div>
-        <div class="segrow"><span style="color:#888">LTV 1위</span><strong>반올림피자 48.9만</strong></div>
-        <div class="segrow"><span style="color:#888">FLGP 1위</span><strong>파파존스 26,659원</strong></div>
-        <div style="margin-top:10px;padding:7px 10px;background:#fffbe6;border-radius:6px;font-size:11px;color:#92400e;line-height:1.5;">💡 청년피자 복귀 고객 재잔존율 1위 — 브랜드 충성도 강함</div>
-      </div></div>
-    </div>
+  <div class="mode-tab" onclick="switchMode('brand')">
+    <span>② 브랜드 잔존율</span><span class="sub">같은 브랜드 재주문 (충성도)</span>
   </div>
 </div>
 
-<div class="seg-tabs">
-  <div class="seg-tab active" onclick="switchTab('first')">0. 첫주문</div>
-  <div class="seg-tab" onclick="switchTab('active')">1. 활성</div>
-  <div class="seg-tab" onclick="switchTab('ret')">2. 이탈복귀</div>
+<!-- ===================== 모드1: 플랫폼 잔존율 ===================== -->
+<div id="mode-platform" class="mode-view active">
+  <div class="note">⚠️ <strong>플랫폼 잔존율</strong>: 진입월(M+0)에 해당 브랜드를 주문한 고객이 M+N에 <strong>플랫폼(푸드 전체) 어디서든</strong> 주문 시 잔존으로 집계. LTV도 플랫폼 전체 주문분. | M+12 지표는 <strong>2025/05~2025/06 코호트 기준</strong>(M+12 데이터 보유 코호트). 할인비용: 우형부담(쿠폰+HVA+MFO+배민클럽)</div>
+
+  <div class="summary">
+    <div class="summary-head"><span style="font-size:18px;">📋</span>
+      <div><div style="font-size:15px;font-weight:800;">Executive Summary — 피자 10개 브랜드 (플랫폼 잔존율)</div>
+      <div style="font-size:12px;opacity:.75;margin-top:2px;">잔존율 / LTV / 수익성(FLGP) 종합 · 코호트 2025/05~2026/05</div></div>
+    </div>
+    <div class="summary-body">
+      <div class="verdict">
+        <strong style="color:#9a2617;">💡 핵심 판정</strong><br>
+        <strong>청년피자</strong>가 활성·이탈복귀 잔존율 1위로 재구매 충성도가 가장 높고,
+        <strong>파파존스</strong>는 전 세그 LTV·FLGP 최상위권으로 객단가·수익성이 가장 우수.
+        반면 <strong>빽보이피자</strong>는 전 세그 잔존율 최하위 + 할인비용 최고로, 할인 의존도가 높고 수익성이 가장 취약.
+        <strong>피자스쿨·피나치공</strong>은 첫주문 잔존율 1·2위로 신규 고객 유지에 강점.<br>
+        <span style="font-size:12px;color:#888;">※ 본 탭의 잔존율은 "플랫폼 전체 재주문" 기준이라 절대값이 높게 잡힘. 순수 브랜드 충성도는 ② 브랜드 잔존율 탭 참고.</span>
+      </div>
+      <div class="seg3">
+        <div class="segcard"><h4>0. 첫주문 — 신규 유지</h4><div class="body">
+          <div class="segrow"><span style="color:#888">잔존율 1위</span><strong style="color:#059669">피자스쿨 22.6%</strong></div>
+          <div class="segrow"><span style="color:#888">LTV 1위</span><strong>노모어피자 34.8만</strong></div>
+          <div class="segrow"><span style="color:#888">FLGP 1위</span><strong>피자헛 9,106원</strong></div>
+          <div style="margin-top:10px;padding:7px 10px;background:#fef2f2;border-radius:6px;font-size:11px;color:#b91c1c;line-height:1.5;">⚠️ 빽보이피자 잔존율 11.7%로 최하위 — 첫 구매 후 이탈 심각</div>
+        </div></div>
+        <div class="segcard" style="border:2px solid #9a2617;"><h4 style="background:#9a2617;">1. 활성 — 헤비유저</h4><div class="body">
+          <div class="segrow"><span style="color:#888">잔존율 1위</span><strong style="color:#059669">청년피자 58.7%</strong></div>
+          <div class="segrow"><span style="color:#888">LTV 1위</span><strong>파파존스 162.4만</strong></div>
+          <div class="segrow"><span style="color:#888">FLGP 1위</span><strong>파파존스 96,172원</strong></div>
+          <div style="margin-top:10px;padding:7px 10px;background:#fef6f4;border-radius:6px;font-size:11px;color:#9a2617;line-height:1.5;">✅ 파파존스 객단가·수익성 모두 1위 — 프리미엄 헤비유저층 확보</div>
+        </div></div>
+        <div class="segcard"><h4>2. 이탈복귀 — 재활성</h4><div class="body">
+          <div class="segrow"><span style="color:#888">잔존율 1위</span><strong style="color:#059669">청년피자 38.7%</strong></div>
+          <div class="segrow"><span style="color:#888">LTV 1위</span><strong>반올림피자 48.9만</strong></div>
+          <div class="segrow"><span style="color:#888">FLGP 1위</span><strong>파파존스 26,659원</strong></div>
+          <div style="margin-top:10px;padding:7px 10px;background:#fffbe6;border-radius:6px;font-size:11px;color:#92400e;line-height:1.5;">💡 청년피자 복귀 고객 재잔존율 1위 — 브랜드 충성도 강함</div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="seg-tabs">
+    <div class="seg-tab active" onclick="switchTab('platform','first')">0. 첫주문</div>
+    <div class="seg-tab" onclick="switchTab('platform','active')">1. 활성</div>
+    <div class="seg-tab" onclick="switchTab('platform','ret')">2. 이탈복귀</div>
+  </div>
+  <div id="platform-panel-first" class="panel active"></div>
+  <div id="platform-panel-active" class="panel"></div>
+  <div id="platform-panel-ret" class="panel"></div>
 </div>
-<div id="panel-first" class="panel active"></div>
-<div id="panel-active" class="panel"></div>
-<div id="panel-ret" class="panel"></div>
+
+<!-- ===================== 모드2: 브랜드 잔존율 ===================== -->
+<div id="mode-brand" class="mode-view">
+  <div class="note brandnote">🔒 <strong>브랜드 잔존율</strong>: 진입월(M+0)에 해당 브랜드를 주문한 고객이 M+N에 <strong>같은 브랜드를 재주문</strong>한 경우만 잔존으로 집계. LTV도 해당 브랜드 주문분만 합산 → 순수 브랜드 충성도/가치.</div>
+  <div id="brand-content"></div>
+</div>
+
 <br>
 <script>
-const RAW =[
+const RAW_PLATFORM =[
     {
         "brand":  "노모어피자",
         "category":  "PIZZA",
@@ -4018,22 +4053,25 @@ const RAW =[
     }
 ]
 ;
+const RAW_BRAND = [];   /* ★ 브랜드 잔존율 데이터 부으면 여기 채움 */
 const SEG_MAP = { first:'0.첫주문', active:'1.활성', ret:'2.이탈복귀' };
 const PALETTE = ['#9a2617','#e63946','#f4a261','#e9c46a','#2a9d8f','#457b9d','#264653','#9b5de5','#118ab2','#06d6a0'];
-const BRANDS  = [...new Set(RAW.map(function(d){return d.brand;}))].sort();
-const BC = {};
-BRANDS.forEach(function(b,i){ BC[b]=PALETTE[i%PALETTE.length]; });
-function getData(seg,md){ return RAW.filter(function(d){return d.seg===seg&&d.month_diff===md;}).sort(function(a,b){return b.retention-a.retention;}); }
-function getSeries(b,seg){ return RAW.filter(function(d){return d.brand===b&&d.seg===seg;}).sort(function(a,b){return a.month_diff-b.month_diff;}); }
-function pct(n){ return (n||0).toFixed(1)+'%'; }
-function won(n){ return (n||0).toLocaleString('ko-KR')+'원'; }
 const charts = {};
 const MONTHS = [0,1,2,3,4,5,6,7,8,9,10,11,12];
+function pct(n){ return (n||0).toFixed(1)+'%'; }
+function won(n){ return (n||0).toLocaleString('ko-KR')+'원'; }
+function mc(id,cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),cfg); }
 
-function buildPanel(tabKey){
+function buildPanel(mode, tabKey){
+  const RAW = mode==='platform' ? RAW_PLATFORM : RAW_BRAND;
   const seg = SEG_MAP[tabKey];
-  const rows12 = getData(seg,12);
-  const el = document.getElementById('panel-'+tabKey);
+  const BRANDS = [...new Set(RAW.map(function(d){return d.brand;}))].sort();
+  const BC = {}; BRANDS.forEach(function(b,i){ BC[b]=PALETTE[i%PALETTE.length]; });
+  function getData(md){ return RAW.filter(function(d){return d.seg===seg&&d.month_diff===md;}).sort(function(a,b){return b.retention-a.retention;}); }
+  function getSeries(b){ return RAW.filter(function(d){return d.brand===b&&d.seg===seg;}).sort(function(a,b){return a.month_diff-b.month_diff;}); }
+
+  const rows12 = getData(12);
+  const el = document.getElementById(mode+'-panel-'+tabKey);
   let html = '<div class="section-title">M+12 브랜드 순위 (잔존율 기준)</div><div class="card-grid">';
   rows12.forEach(function(d,i){
     const rc = i===0?'top1':i===1?'top2':i===2?'top3':(i>=rows12.length-2?'bot':'');
@@ -4046,7 +4084,7 @@ function buildPanel(tabKey){
       +'<div class="metric"><span class="label">누적 FLGP</span><span class="value '+(d.cum_flgp>=0?'pos':'neg')+'">'+won(d.cum_flgp)+'</span></div></div>';
   });
   html += '</div>';
-  const uid = tabKey;
+  const uid = mode+'-'+tabKey;
   html += '<div class="section-title">잔존율 추이 (M+0 → M+12)</div><div class="chart-full"><canvas id="c-ret-'+uid+'"></canvas></div>'
     +'<div class="section-title">누적 인당 주문금액(LTV) 추이</div><div class="chart-full"><canvas id="c-ltv-'+uid+'"></canvas></div>'
     +'<div class="section-title">M+12 브랜드 비교</div><div class="chart-row">'
@@ -4062,16 +4100,15 @@ function buildPanel(tabKey){
   html += '</tbody></table>';
   el.innerHTML = html;
 
-  function mc(id,cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),cfg); }
   mc('c-ret-'+uid,{ type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
-    datasets:BRANDS.map(function(b){ var s=getSeries(b,seg);
+    datasets:BRANDS.map(function(b){ var s=getSeries(b);
       return { label:b, data:MONTHS.map(function(m){var r=s.find(function(x){return x.month_diff===m;}); return r?r.retention:null;}),
         borderColor:BC[b], backgroundColor:BC[b]+'22', borderWidth:2, pointRadius:3, tension:0.3, spanGaps:false }; }) },
     options:{ responsive:true, plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:8}},
       tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y||0).toFixed(1)+'%';}}}},
       scales:{y:{title:{display:true,text:'잔존율(%)'},min:0},x:{grid:{display:false}}} } });
   mc('c-ltv-'+uid,{ type:'line', data:{ labels:MONTHS.map(function(m){return 'M+'+m;}),
-    datasets:BRANDS.map(function(b){ var s=getSeries(b,seg);
+    datasets:BRANDS.map(function(b){ var s=getSeries(b);
       return { label:b, data:MONTHS.map(function(m){var r=s.find(function(x){return x.month_diff===m;}); return r?r.cum_ltv:null;}),
         borderColor:BC[b], backgroundColor:BC[b]+'22', borderWidth:2, pointRadius:3, tension:0.3, spanGaps:false }; }) },
     options:{ responsive:true, plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:8}},
@@ -4088,10 +4125,52 @@ function buildPanel(tabKey){
     options:{ indexAxis:'y', responsive:true, plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return (c.parsed.x||0).toLocaleString('ko-KR')+'원';}}}},
       scales:{x:{title:{display:true,text:'원'},ticks:{callback:function(v){return (v/10000).toFixed(0)+'만';}}},y:{ticks:{font:{size:11}}}} } });
 }
-function switchTab(key){
-  document.querySelectorAll('.seg-tab').forEach(function(t,i){ t.classList.toggle('active',['first','active','ret'][i]===key); });
-  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
-  document.getElementById('panel-'+key).classList.add('active');
+
+var built = { platform:false, brand:false };
+function buildMode(mode){
+  if(mode==='brand' && (!RAW_BRAND || RAW_BRAND.length===0)){
+    document.getElementById('brand-content').innerHTML =
+      '<div class="placeholder"><div class="icon">🚧</div>'
+      +'<h2>브랜드 잔존율 데이터 준비중</h2>'
+      +'<p>수정한 쿼리(performance_raw에 brand_map 조인 + final_matrix brand_nm 매칭) 결과를<br>'
+      +'새 시트에 부어주시면, 이 탭에 플랫폼 잔존율과 <strong>동일한 구조</strong>로 자동 표시됩니다.<br>'
+      +'<span style="color:#9a2617;font-weight:600;">진입 브랜드를 같은 브랜드에서 재주문한 순수 충성도 기준</span></p></div>';
+    built.brand = true;
+    return;
+  }
+  if(mode==='brand'){
+    // 브랜드 데이터가 있으면 플랫폼과 동일한 구조 동적 생성
+    document.getElementById('brand-content').innerHTML =
+      '<div class="seg-tabs">'
+      +'<div class="seg-tab active" onclick="switchTab(\'brand\',\'first\')">0. 첫주문</div>'
+      +'<div class="seg-tab" onclick="switchTab(\'brand\',\'active\')">1. 활성</div>'
+      +'<div class="seg-tab" onclick="switchTab(\'brand\',\'ret\')">2. 이탈복귀</div>'
+      +'</div>'
+      +'<div id="brand-panel-first" class="panel active"></div>'
+      +'<div id="brand-panel-active" class="panel"></div>'
+      +'<div id="brand-panel-ret" class="panel"></div>';
+    buildPanel('brand','first'); buildPanel('brand','active'); buildPanel('brand','ret');
+    built.brand = true;
+    return;
+  }
+  // platform
+  buildPanel('platform','first'); buildPanel('platform','active'); buildPanel('platform','ret');
+  built.platform = true;
 }
-buildPanel('first'); buildPanel('active'); buildPanel('ret');
+
+function switchMode(mode){
+  document.querySelectorAll('.mode-tab').forEach(function(t,i){ t.classList.toggle('active',['platform','brand'][i]===mode); });
+  document.querySelectorAll('.mode-view').forEach(function(v){ v.classList.remove('active'); });
+  document.getElementById('mode-'+mode).classList.add('active');
+  if(!built[mode]) buildMode(mode);
+}
+
+function switchTab(mode, key){
+  var view = document.getElementById('mode-'+mode);
+  view.querySelectorAll('.seg-tab').forEach(function(t,i){ t.classList.toggle('active',['first','active','ret'][i]===key); });
+  view.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+  document.getElementById(mode+'-panel-'+key).classList.add('active');
+}
+
+buildMode('platform');
 </script></body></html>
